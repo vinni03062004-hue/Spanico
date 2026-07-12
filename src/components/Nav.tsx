@@ -20,7 +20,7 @@ const LINKS: [string, string][] = [
 
 export function Nav() {
   const path = usePathname();
-  if (path === "/" || path === "/login" || path === "/onboarding") return null;
+  if (path === "/" || path === "/profiles" || path === "/onboarding") return null;
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-base/80 backdrop-blur">
       <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-3">
@@ -44,7 +44,7 @@ export function Nav() {
           </ul>
         </nav>
         <form action="/api/auth/logout" method="post">
-          <button className="btn-ghost btn text-sm" type="submit">Abmelden</button>
+          <button className="btn-ghost btn text-sm" type="submit">Profil wechseln</button>
         </form>
       </div>
     </header>

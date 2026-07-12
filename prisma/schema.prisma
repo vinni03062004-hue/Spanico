@@ -18,10 +18,15 @@ datasource db {
   directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
+// "User" ist jetzt ein auswählbares PROFIL (ohne Passwort/Login).
+// Jedes Profil hat einen eigenen Speicherstand (alle Relationen unten) und
+// einen anpassbaren Comic-Avatar (avatar als JSON mit DiceBear-Optionen).
 model User {
   id            String   @id @default(cuid())
-  email         String   @unique
-  passwordHash  String
+  name          String   @default("Profil")
+  avatar        Json?    // Avatar-Konfiguration (Comic, anpassbar)
+  email         String?  @unique
+  passwordHash  String?
   role          Role     @default(LERNER)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

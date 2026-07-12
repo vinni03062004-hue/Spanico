@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { COOKIE } from "@/lib/constants";
 
-const PUBLIC = ["/login"];
+const PUBLIC = ["/profiles"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -12,13 +12,14 @@ export function middleware(req: NextRequest) {
   const hasCookie = req.cookies.has(COOKIE);
   if (!hasCookie) {
     const url = req.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/profiles";
     return NextResponse.redirect(url);
   }
   return NextResponse.next();
 }
 
 export const config = {
-  // Alles ausser statischen Assets und Auth-API absichern.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/auth|api/seed).*)"],
+  // Alles absichern ausser: statische Assets, Profil-API (Auswahl vor Login)
+  // und Seed-API.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/profiles|api/seed).*)"],
 };

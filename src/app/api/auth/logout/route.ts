@@ -3,5 +3,5 @@ import { clearSession } from "@/lib/auth";
 
 export async function POST(req: Request) {
   clearSession();
-  return NextResponse.redirect(new URL("/login", req.url));
+  return NextResponse.redirect(new URL("/profiles", req.url));
 }
