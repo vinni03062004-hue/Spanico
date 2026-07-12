@@ -16,6 +16,7 @@ export default function Jarvis() {
   const [hint, setHint] = useState<string | null>(null);
   const [supported, setSupported] = useState(true);
   const [running, setRunning] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const recRef = useRef<SpanishRecognizer | null>(null);
   const sessionRef = useRef<string | undefined>();
@@ -38,6 +39,16 @@ export default function Jarvis() {
         },
         onFinal: (t, conf) => { setInterim(""); handleUser(t, conf); },
         onState: (s) => { if (s === "error") setState("error"); },
+        onError: (code) => {
+          // Nur echte Probleme melden; kurz, dann weiter zuhören.
+          const map: Record<string, string> = {
+            "not-allowed": "Mikrofon nicht erlaubt — bitte im Browser die Mikrofon-Berechtigung für diese Seite erlauben.",
+            "service-not-allowed": "Mikrofon blockiert — Berechtigung im Browser erlauben.",
+            "audio-capture": "Kein Mikrofon gefunden.",
+            "network": "Netzwerkproblem bei der Spracherkennung — nutze am besten Chrome.",
+          };
+          setNotice(map[code] || `Spracherkennung: ${code}. Für Sprache am besten Chrome (Desktop/Android) nutzen.`);
+        },
       },
       []
     );
@@ -142,6 +153,7 @@ export default function Jarvis() {
           {interim && <p className="text-muted italic">Du: {interim}…</p>}
         </div>
         {!supported && <p className="text-bad text-sm text-center mb-2">Dein Browser unterstützt die Spracherkennung nicht. Nutze Chrome/Edge (Desktop/Android) oder den Aussprache-Modus.</p>}
+        {notice && <p className="text-warn text-sm text-center mb-2">{notice}</p>}
         <div className="flex gap-2 justify-center">
           {!running ? (
             <button className="btn btn-primary px-8" onClick={start}>● Gespräch starten</button>

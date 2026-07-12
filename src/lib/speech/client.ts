@@ -8,6 +8,7 @@ export interface SttHandlers {
   onInterim?: (text: string) => void;
   onFinal?: (text: string, confidence: number) => void;
   onState?: (s: "listening" | "idle" | "error") => void;
+  onError?: (code: string) => void;
 }
 
 export class SpanishRecognizer {
@@ -39,7 +40,12 @@ export class SpanishRecognizer {
       }
       if (interim) this.handlers.onInterim?.(interim.trim());
     };
-    this.rec.onerror = () => this.handlers.onState?.("error");
+    this.rec.onerror = (e: any) => {
+      const code = e?.error || "unknown";
+      // Harmlose Meldungen (keine Sprache erkannt / abgebrochen) NICHT als Fehler behandeln.
+      if (code === "no-speech" || code === "aborted") return;
+      this.handlers.onError?.(code);
+    };
     this.rec.onend = () => {
       // Auto-Neustart fuer quasi-kontinuierliche Konversation (kleine Pausen != Ende).
       if (this.active) {

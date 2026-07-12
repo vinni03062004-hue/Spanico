@@ -44,8 +44,9 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <VocabSetup onDone={() => fetch("/api/progress").then((r) => r.json()).then(setP)} />
       {p && p.vocabTotal === 0 && (
-        <VocabSetup onDone={() => fetch("/api/progress").then((r) => r.json()).then(setP)} />
+        <p className="text-warn text-sm">Noch keine Wörter geladen — klick oben „Grundwortschatz laden".</p>
       )}
 
       <div className="grid sm:grid-cols-3 gap-3">

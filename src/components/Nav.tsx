@@ -27,8 +27,8 @@ export function Nav() {
         <Link href="/dashboard" className="font-semibold tracking-tight text-primary shrink-0">
           ● Español Coach
         </Link>
-        <nav className="flex-1 overflow-x-auto">
-          <ul className="flex items-center gap-1 text-sm">
+        <nav className="flex-1">
+          <ul className="flex items-center flex-wrap gap-1 text-sm">
             {LINKS.map(([href, label]) => (
               <li key={href}>
                 <Link
