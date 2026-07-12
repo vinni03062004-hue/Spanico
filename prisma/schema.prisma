@@ -1,0 +1,260 @@
+// Datenmodell der Spanisch-Lern-App.
+// Umgesetzt fuer Neon-Postgres. Deckt die in der Spezifikation geforderten
+// Entitaeten ab (User, LanguageProfile, VocabularyEntry, ExerciseAttempt,
+// SpeechAttempt, ErrorEvent, MasteryRecord, ReviewSchedule, Scenario,
+// SkillScore, ConversationSession, Turn, ProgressSnapshot, ModelTrace ...).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Vercel-native Neon-Integration setzt diese beiden Variablen automatisch:
+  //   DATABASE_URL           = gepoolte Verbindung (Laufzeit)
+  //   DATABASE_URL_UNPOOLED  = direkte Verbindung (Migrationen / db push)
+  // Lokal ohne Vercel: in .env.local einfach beide auf deinen Neon-String setzen.
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  role          Role     @default(LERNER)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  settings         UserSettings?
+  languageProfile  LanguageProfile?
+  attempts         ExerciseAttempt[]
+  speechAttempts   SpeechAttempt[]
+  errorEvents      ErrorEvent[]
+  masteryRecords   MasteryRecord[]
+  reviewSchedules  ReviewSchedule[]
+  skillScores      SkillScore[]
+  sessions         ConversationSession[]
+  snapshots        ProgressSnapshot[]
+  assessments      Assessment[]
+}
+
+enum Role {
+  LERNER
+  ADMIN
+}
+
+model UserSettings {
+  id                String  @id @default(cuid())
+  userId            String  @unique
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nativeLanguage    String  @default("de")
+  targetLanguage    String  @default("es")
+  weeklyMinutes     Int     @default(120)
+  intensity         String  @default("mittel") // leicht | mittel | intensiv
+  micConsent        Boolean @default(false)
+  dataConsent       Boolean @default(false)
+  ttsProvider       String  @default("browser") // browser | elevenlabs | openai | azure
+  sttProvider       String  @default("browser") // browser | openai | deepgram
+  updatedAt         DateTime @updatedAt
+}
+
+// Mehrdimensionales Startprofil je Teilkompetenz.
+model LanguageProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal               String   @default("alltag") // alltag | reisen | arbeit | pruefung | freiSprechen
+  // Startwerte 0-100 je Teilkompetenz
+  vocabBreadth       Float    @default(0)
+  listening          Float    @default(0)
+  grammar            Float    @default(0)
+  pronunciation      Float    @default(0)
+  spontaneity        Float    @default(0)
+  freeProduction     Float    @default(0)
+  overallBand        String   @default("Novice unstable")
+  version            Int      @default(1)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model VocabularyEntry {
+  id             String   @id @default(cuid())
+  lemma          String   // spanisches Lemma / Phrase
+  pos            String   // Wortart
+  meaningDe      String   // deutsche Bedeutung
+  explanationEs  String   // einfache spanische Erklaerung
+  examples       Json     // Beispielsaetze [{es, de}]
+  category       String   // thematische Kategorie
+  frequencyTier  Int      // 1 = haeufigster Kernwortschatz
+  layer          String   // kern | alltagsphrasen | thematisch | kollokation | satzbaustein | situativ | fortgeschritten
+  morphology     String?  // morphologische Hinweise
+  collocations   Json?    // typische Kollokationen [string]
+  confusables    Json?    // Verwechslungswoerter [string]
+  imageEmoji     String?  // Bildanker (einfach, erweiterbar auf echte Assets)
+  pronTargets    Json?    // Ausspracheziele [string]
+  createdAt      DateTime @default(now())
+
+  masteryRecords MasteryRecord[]
+  reviews        ReviewSchedule[]
+  errorEvents    ErrorEvent[]
+}
+
+model Scenario {
+  id          String  @id @default(cuid())
+  key         String  @unique // cafe | einkaufen | fitness | smalltalk | wohnung | wegbeschreibung | arzt | arbeit | reise | sozial
+  title       String
+  difficulty  Int     @default(1) // 1-5
+  steps       Json    // [{ prompt_de, targetsEs:[string], hint, coachLine }]
+  targetVocab Json?   // [vocabId | lemma]
+}
+
+// Generische Uebung (Vokabel, Bild, Satzbau, Hoeren, Pruefung).
+model ExerciseAttempt {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode         String   // vokabeln | bilder | satzbau | hoeren | pruefung
+  exerciseType String   // z.B. "uebersetzung", "luecke", "bildBenennen"
+  vocabId      String?
+  prompt       String
+  expected     String?
+  answer       String
+  correct      Boolean
+  confidence   Float    @default(1) // Selbsteinschaetzung / Systemkonfidenz 0-1
+  responseMs   Int      @default(0)
+  score        Float    @default(0) // 0-100 Teilbewertung
+  errorType    String?
+  createdAt    DateTime @default(now())
+}
+
+model SpeechAttempt {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode           String   // aussprache | shadowing | jarvis
+  targetText     String
+  recognizedText String
+  sttConfidence  Float    @default(0)
+  analysis       Json     // PronunciationAnalysis
+  band           String   // schnell verstaendlich | ... | sehr unsicher erkannt
+  uncertain      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
+model ErrorEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vocabId    String?
+  vocab      VocabularyEntry? @relation(fields: [vocabId], references: [id])
+  category   String   // Fehlerkategorie (siehe lib/errors.ts)
+  detail     String?
+  mode       String
+  resolved   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+// Mehrstufige Mastery-Logik pro Inhalt.
+model MasteryRecord {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vocabId       String
+  vocab         VocabularyEntry @relation(fields: [vocabId], references: [id], onDelete: Cascade)
+  // Nachweisstufen als Flags
+  recognized    Boolean  @default(false)
+  understood    Boolean  @default(false)
+  reproduced    Boolean  @default(false)
+  usedInSentence Boolean @default(false)
+  usedInDialog  Boolean  @default(false)
+  delayedRecall Boolean  @default(false)
+  transferred   Boolean  @default(false)
+  masteryLevel  Int      @default(0) // 0-7 (Summe stabiler Nachweise)
+  stableSince   DateTime?
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, vocabId])
+}
+
+// Spacing / Wiederholungsplanung (SM-2-artig, erweitert).
+model ReviewSchedule {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vocabId      String
+  vocab        VocabularyEntry @relation(fields: [vocabId], references: [id], onDelete: Cascade)
+  easeFactor   Float    @default(2.5)
+  intervalDays Float    @default(0)
+  repetitions  Int      @default(0)
+  dueAt        DateTime @default(now())
+  lapses       Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, vocabId])
+}
+
+// Kritische, mehrdimensionale Kompetenzwerte.
+model SkillScore {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dimension  String   // pronunciation | fluency | vocabBreadth | vocabDepth | grammar | listening | reactivity | dialogStability | imageSituation | transfer
+  value      Float    @default(0) // 0-100
+  stability  Float    @default(0) // 0-1, wie stabil/wiederholt belegt
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, dimension])
+}
+
+model ConversationSession {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scenarioKey String?
+  memory     Json     @default("{}") // Conversation Memory Layer (Zielwoerter, Fehler, Korrekturen ...)
+  startedAt  DateTime @default(now())
+  endedAt    DateTime?
+  turns      Turn[]
+}
+
+model Turn {
+  id         String   @id @default(cuid())
+  sessionId  String
+  session    ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role       String   // user | coach
+  text       String
+  feedback   Json?
+  createdAt  DateTime @default(now())
+}
+
+model ProgressSnapshot {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  band       String
+  dimensions Json     // Kopie aller SkillScores
+  createdAt  DateTime @default(now())
+}
+
+model Assessment {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind       String   // onboarding | pruefung
+  result     Json
+  band       String
+  createdAt  DateTime @default(now())
+}
+
+// Nachvollziehbarkeit serverseitiger KI-/Speech-Aufrufe (Auditierbarkeit).
+model ModelTrace {
+  id         String   @id @default(cuid())
+  userId     String?
+  kind       String   // conversation | feedback | tts | stt
+  provider   String
+  requestMeta Json?
+  latencyMs  Int      @default(0)
+  ok         Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}
