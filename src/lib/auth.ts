@@ -3,11 +3,12 @@
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+import { COOKIE } from "./constants";
+
+export { COOKIE };
 
 const secret = () =>
   new TextEncoder().encode(process.env.AUTH_SECRET || "dev-insecure-secret-change-me");
-
-export const COOKIE = "es_session";
 
 export async function hashPassword(pw: string) {
   return bcrypt.hash(pw, 10);

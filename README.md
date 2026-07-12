@@ -123,6 +123,27 @@ einen einzelnen Lerner praktisch unbegrenzt.
 > bevorzugt automatisch Online-Neural-Stimmen und meidet eSpeak. Für garantiert
 > menschlichen Klang trage einen der obigen Keys ein — mehr ist nicht nötig.
 
+### Google-TTS-API-Key holen (WaveNet, menschliche Stimme, ~1 Mio. Zeichen gratis)
+1. Auf https://console.cloud.google.com einloggen und oben ein **Projekt anlegen**
+   (z. B. „espanol-coach").
+2. **APIs & Dienste → Bibliothek** → nach **„Cloud Text-to-Speech API"** suchen →
+   **Aktivieren**. (Einmalig musst du in der Cloud Console ein Abrechnungskonto
+   hinterlegen; der WaveNet-Free-Tier von 1 Mio. Zeichen/Monat bleibt kostenlos.)
+3. **APIs & Dienste → Anmeldedaten → Anmeldedaten erstellen → API-Schlüssel**.
+   Schlüssel kopieren. (Empfohlen: unter „API-Schlüssel einschränken" nur die
+   *Cloud Text-to-Speech API* erlauben.)
+4. In Vercel unter **Settings → Environment Variables** setzen:
+   - `GOOGLE_TTS_API_KEY` = dein Schlüssel
+   - `GOOGLE_TTS_VOICE` = `es-ES-Wavenet-B` (oder z. B. `es-ES-Wavenet-C`,
+     `es-US-Wavenet-B`). **Wichtig:** Genau eine WaveNet-Stimme eintragen, damit
+     nicht die Standard-/Basisstimme genutzt wird.
+5. Neu deployen. Die App nutzt jetzt automatisch die WaveNet-Stimme; der
+   Audio-Cache sorgt dafür, dass das Kontingent kaum verbraucht wird.
+
+> Der `GOOGLE_TTS_VOICE`-Wert IST der „Pfad" zum Modell: Alles mit `-Wavenet-`
+> nutzt WaveNet, `-Neural2-` nutzt Neural2. Ohne diese Variable nimmt die App
+> bereits standardmäßig `es-ES-Wavenet-B`.
+
 **Persistenter Audio-Cache (optional, empfohlen bei viel Nutzung):** aktuell
 cached der Server im Arbeitsspeicher. Für dauerhaftes Caching über Deploys hinweg
 kann man in `src/app/api/tts/route.ts` statt der `Map` z. B. Vercel Blob oder S3

@@ -2,7 +2,7 @@
 // Prueft nur die Existenz des Session-Cookies (leichtgewichtig, Edge-tauglich);
 // die eigentliche Verifikation passiert in den API-Routen/Server-Komponenten.
 import { NextRequest, NextResponse } from "next/server";
-import { COOKIE } from "@/lib/auth";
+import { COOKIE } from "@/lib/constants";
 
 const PUBLIC = ["/login"];
 

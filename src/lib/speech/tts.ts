@@ -103,7 +103,11 @@ async function azure(req: TtsRequest): Promise<TtsResult> {
 
 async function google(req: TtsRequest): Promise<TtsResult> {
   const key = process.env.GOOGLE_TTS_API_KEY!;
-  const voice = req.voice || "es-ES-Neural2-A";
+  // Standardmäßig eine WaveNet-Stimme (menschlich, im Free-Tier bis 1 Mio. Zeichen/Monat).
+  // Per ENV GOOGLE_TTS_VOICE überschreibbar, z.B. "es-ES-Wavenet-C" oder "es-ES-Neural2-A".
+  const voice = req.voice || process.env.GOOGLE_TTS_VOICE || "es-ES-Wavenet-B";
+  // languageCode aus dem Stimmennamen ableiten (z.B. es-ES-Wavenet-B -> es-ES).
+  const languageCode = voice.split("-").slice(0, 2).join("-") || "es-ES";
   const res = await fetch(
     `https://texttospeech.googleapis.com/v1/text:synthesize?key=${key}`,
     {
@@ -111,7 +115,7 @@ async function google(req: TtsRequest): Promise<TtsResult> {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         input: { text: req.text },
-        voice: { languageCode: "es-ES", name: voice },
+        voice: { languageCode, name: voice },
         audioConfig: { audioEncoding: "MP3" },
       }),
     }

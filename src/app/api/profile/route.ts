@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
         update: v, create: { userId: u.userId, dimension: dim, ...v },
       });
     }
-    await tx.assessment.create({ data: { userId: u.userId, kind: "onboarding", result: d, band } });
+    await tx.assessment.create({ data: { userId: u.userId, kind: "onboarding", result: d as any, band } });
   });
 
   return NextResponse.json({ ok: true, band });

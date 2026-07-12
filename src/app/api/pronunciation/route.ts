@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   };
 
   await prisma.speechAttempt.create({
-    data: { userId: u.userId, mode, targetText, recognizedText, sttConfidence, analysis, band, uncertain },
+    data: { userId: u.userId, mode, targetText, recognizedText, sttConfidence, analysis: analysis as any, band, uncertain },
   });
 
   // Aussprache-Score kritisch aktualisieren (unsichere Ergebnisse gedaempft)

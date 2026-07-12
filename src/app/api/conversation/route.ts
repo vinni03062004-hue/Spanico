@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
   // Turns speichern
   if (userSaid) await prisma.turn.create({ data: { sessionId: session.id, role: "user", text: userSaid } });
   await prisma.turn.create({ data: { sessionId: session.id, role: "coach", text: coach.reply, feedback: coach as any } });
-  await prisma.conversationSession.update({ where: { id: session.id }, data: { memory: newMemory } });
+  await prisma.conversationSession.update({ where: { id: session.id }, data: { memory: newMemory as any } });
   await prisma.modelTrace.create({ data: { userId: u.userId, kind: "conversation", provider: coach.provider, latencyMs: Date.now() - t0, ok: true } });
 
   const advance = coach.matchedTargets.length > 0 || !step.targetsEs?.length;

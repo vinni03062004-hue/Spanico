@@ -23,7 +23,7 @@ async function main() {
       confusables: v.confusables ?? [],
       imageEmoji: v.imageEmoji ?? null,
       pronTargets: v.pronTargets ?? [],
-    };
+    } as any; // JSON-Felder (examples etc.) fuer Prisma freigeben
     if (existing) await prisma.vocabularyEntry.update({ where: { id: existing.id }, data });
     else await prisma.vocabularyEntry.create({ data });
   }
@@ -32,8 +32,8 @@ async function main() {
   for (const s of SCENARIOS) {
     await prisma.scenario.upsert({
       where: { key: s.key },
-      update: { title: s.title, difficulty: s.difficulty, steps: s.steps, targetVocab: s.targetVocab },
-      create: { key: s.key, title: s.title, difficulty: s.difficulty, steps: s.steps, targetVocab: s.targetVocab },
+      update: { title: s.title, difficulty: s.difficulty, steps: s.steps as any, targetVocab: s.targetVocab as any },
+      create: { key: s.key, title: s.title, difficulty: s.difficulty, steps: s.steps as any, targetVocab: s.targetVocab as any },
     });
   }
 
