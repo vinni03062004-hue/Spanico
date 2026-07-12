@@ -34,17 +34,18 @@ async function translateBatch(words: string[]): Promise<Record<string, string>> 
   const anthropic = process.env.ANTHROPIC_API_KEY;
 
   if (gemini) {
-    const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+    const model = process.env.GEMINI_MODEL || "gemini-1.5-flash-latest";
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${gemini}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYS_TRANS }] },
-        contents: [{ role: "user", parts: [{ text: JSON.stringify(words) }] }],
-        generationConfig: { responseMimeType: "application/json" },
+        contents: [{ role: "user", parts: [{ text: SYS_TRANS + "\n\nWörter: " + JSON.stringify(words) }] }],
       }),
     });
-    if (!res.ok) throw new Error("gemini " + res.status);
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error("gemini " + res.status + " " + body.slice(0, 300));
+    }
     const data = await res.json();
     return parseObj(data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}");
   }

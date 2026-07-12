@@ -63,16 +63,15 @@ export async function runCoach(ctx: CoachContext): Promise<CoachResult> {
 
 // Google Gemini (kostenloser Free-Tier über Google AI Studio).
 async function viaGemini(ctx: CoachContext, key: string): Promise<CoachResult> {
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-1.5-flash-latest";
+  const userText = SYSTEM + "\n\nKontext (JSON): " + JSON.stringify({ szenario: ctx.scenarioTitle, aufgabe: ctx.stepPromptDe, zielphrasen: ctx.targetsEs, niveau: ctx.level, gedaechtnis: ctx.memory, nutzer_sagte: ctx.userSaid });
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
     {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYSTEM }] },
-        contents: [{ role: "user", parts: [{ text: JSON.stringify({ szenario: ctx.scenarioTitle, aufgabe: ctx.stepPromptDe, zielphrasen: ctx.targetsEs, niveau: ctx.level, gedaechtnis: ctx.memory, nutzer_sagte: ctx.userSaid }) }] }],
-        generationConfig: { responseMimeType: "application/json" },
+        contents: [{ role: "user", parts: [{ text: userText }] }],
       }),
     }
   );

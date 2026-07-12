@@ -14,7 +14,10 @@ export interface SttHandlers {
 export class SpanishRecognizer {
   private rec: any = null;
   private active = false;
+  private muted = false; // waehrend die KI spricht, um Echo zu vermeiden
   supported = false;
+
+  setMuted(m: boolean) { this.muted = m; }
 
   constructor(private handlers: SttHandlers, private biasPhrases: string[] = []) {
     if (typeof window === "undefined") return;
@@ -28,6 +31,7 @@ export class SpanishRecognizer {
     this.rec.maxAlternatives = 1;
 
     this.rec.onresult = (e: any) => {
+      if (this.muted) return; // Ergebnisse ignorieren, solange die KI spricht (Echo-Schutz)
       let interim = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const r = e.results[i];

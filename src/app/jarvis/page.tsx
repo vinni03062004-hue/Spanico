@@ -34,8 +34,6 @@ export default function Jarvis() {
       {
         onInterim: (t) => {
           setInterim(t);
-          // Barge-in: spricht der Nutzer waehrend die KI redet, wird abgebrochen.
-          if (speakingRef.current) { cancelSpeech(); speakingRef.current = false; setState("interrupted"); }
         },
         onFinal: (t, conf) => { setInterim(""); handleUser(t, conf); },
         onState: (s) => { if (s === "error") setState("error"); },
@@ -103,10 +101,14 @@ export default function Jarvis() {
         }).catch(() => {});
       }
 
-      // KI spricht (menschliche Stimme via /api/tts, sonst Browser)
+      // KI spricht (menschliche Stimme via /api/tts, sonst Browser).
+      // Mikro stummschalten, damit die eigene Stimme keine "Unterbrechung" auslöst.
       speakingRef.current = true;
       setState("speaking");
+      recRef.current?.setMuted(true);
       await speak(res.reply, { onEnd: () => { speakingRef.current = false; } });
+      recRef.current?.setMuted(false);
+      setInterim("");
       if (running) setState("listening");
     } catch {
       setState("error");
