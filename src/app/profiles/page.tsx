@@ -9,13 +9,23 @@ export default function Profiles() {
   const router = useRouter();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [editor, setEditor] = useState<null | { id?: string; name: string; avatar: AvatarOptions }>(null);
 
   async function load() {
     setLoading(true);
-    const d = await fetch("/api/profiles").then((r) => r.json());
-    setProfiles(d.profiles || []);
-    setLoading(false);
+    setError(null);
+    try {
+      const res = await fetch("/api/profiles");
+      if (!res.ok) throw new Error("db");
+      const d = await res.json();
+      setProfiles(d.profiles || []);
+    } catch {
+      // Meist: Datenbank noch nicht verbunden / Tabellen fehlen.
+      setError("Die Datenbank ist noch nicht verbunden. Verbinde in Vercel unter Storage eine Neon-Datenbank und deploye neu — dann erscheinen hier deine Profile.");
+    } finally {
+      setLoading(false);
+    }
   }
   useEffect(() => { load(); }, []);
 
@@ -39,6 +49,12 @@ export default function Profiles() {
 
       {loading ? (
         <p className="label">Lädt…</p>
+      ) : error ? (
+        <div className="card p-6 max-w-md text-center space-y-3">
+          <p className="text-warn text-2xl">⚠</p>
+          <p className="text-sm">{error}</p>
+          <button className="btn btn-primary" onClick={load}>Erneut versuchen</button>
+        </div>
       ) : (
         <div className="flex flex-wrap justify-center gap-6 max-w-3xl">
           {profiles.map((p) => (

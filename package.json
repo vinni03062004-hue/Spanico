@@ -5,7 +5,7 @@
   "description": "Wissenschaftlich fundierte Spanisch-Lern-App mit Jarvis-Sprachmodus (Full-Stack, Next.js + Neon)",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && (prisma db push --skip-generate || echo 'DB push uebersprungen (DB noch nicht verbunden)') && next build",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
@@ -40,7 +40,5 @@
     "tsx": "^4.19.1",
     "typescript": "^5.6.2"
   },
-  "engines": {
-    "node": "22.x"
-  }
+  "_engines_hinweis": "Node-Version bewusst nicht gepinnt - Vercel waehlt automatisch eine unterstuetzte Version (z.B. 22 oder 24)."
 }
