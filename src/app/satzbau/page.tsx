@@ -18,13 +18,17 @@ export default function Satzbau() {
 
   const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[¿?¡!.,]/g, "").replace(/\s+/g, " ").trim();
 
-  async function check() {
+  function check() {
     const correct = norm(answer) === norm(t.expected) || overlap(norm(answer), norm(t.expected)) >= 0.8;
-    const res = await fetch("/api/attempts", {
+    // Sofort auswerten (lokal), Speichern im Hintergrund.
+    setResult({ correct });
+    fetch("/api/attempts", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ mode: "satzbau", exerciseType: t.type, prompt: t.prompt_de, expected: t.expected, answer, correct, confidence: correct ? 0.85 : 0.5, dimension: t.dimension, evidence: "usedInSentence", contextNovel: true }),
-    }).then((r) => r.json());
-    setResult({ correct, errorType: res.errorType });
+    })
+      .then((r) => r.json())
+      .then((res) => setResult({ correct, errorType: res.errorType }))
+      .catch(() => {});
   }
   function next() { setI((x) => (x + 1) % TASKS.length); setAnswer(""); setResult(null); }
 

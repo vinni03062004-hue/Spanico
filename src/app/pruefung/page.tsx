@@ -25,11 +25,12 @@ export default function Pruefung() {
   const q = EXAM[i];
   const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[¿?¡!.,]/g, "").trim();
 
-  async function submit(correct: boolean, answerText: string, dim: string, kind: string) {
-    await fetch("/api/attempts", {
+  function submit(correct: boolean, answerText: string, dim: string, kind: string) {
+    // Speichern im Hintergrund; die Prüfung läuft sofort weiter.
+    fetch("/api/attempts", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ mode: "pruefung", exerciseType: kind, prompt: (q as any).prompt, expected: (q as any).expected, answer: answerText, correct, confidence: 0.7, dimension: dim, contextNovel: true }),
-    });
+    }).catch(() => {});
     setScores((s) => [...s, { dim, correct }]);
     if (i + 1 >= EXAM.length) setDone(true);
     else { setI(i + 1); setAnswer(""); setPicked(null); }

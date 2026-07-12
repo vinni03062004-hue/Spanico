@@ -36,5 +36,7 @@ export async function GET() {
   if (dueNow > 0) rec.push(`${dueNow} fällige Wiederholungen abarbeiten.`);
   if (!rec.length) rec.push("Wortschatz ausbauen und Szenarien vertiefen.");
 
-  return NextResponse.json({ band, dims, strongest, weakest, topErrors, masteredStable, dueNow, recommendations: rec });
+  const vocabTotal = await prisma.vocabularyEntry.count();
+
+  return NextResponse.json({ band, dims, strongest, weakest, topErrors, masteredStable, dueNow, recommendations: rec, vocabTotal });
 }

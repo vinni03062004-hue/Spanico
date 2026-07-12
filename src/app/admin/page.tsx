@@ -5,7 +5,15 @@ export default function Admin() {
   const [d, setD] = useState<any>(null);
   const [seedMsg, setSeedMsg] = useState("");
   const [imp, setImp] = useState<{ running: boolean; processed: number; available: number; total: number } | null>(null);
+  const [tts, setTts] = useState<any>(null);
+  const [ttsBusy, setTtsBusy] = useState(false);
   useEffect(() => { fetch("/api/admin").then((r) => r.json()).then(setD); }, []);
+  async function testTts() {
+    setTtsBusy(true); setTts(null);
+    try { setTts(await fetch("/api/tts/test").then((r) => r.json())); }
+    catch { setTts({ ok: false, message: "Anfrage fehlgeschlagen" }); }
+    setTtsBusy(false);
+  }
   async function seed() {
     setSeedMsg("…");
     const r = await fetch("/api/seed", { method: "POST" }).then((x) => x.json());
@@ -31,6 +39,21 @@ export default function Admin() {
         <button className="btn btn-primary" onClick={seed}>Seed ausführen</button>
       </div>
       {seedMsg && <p className="text-sm text-good">{seedMsg}</p>}
+
+      <div className="card p-5">
+        <div className="flex items-center justify-between">
+          <div><p className="font-medium">Sprachausgabe testen (Google/WaveNet)</p><p className="label">Prüft, ob dein TTS-Key funktioniert — sonst mit genauem Hinweis.</p></div>
+          <button className="btn btn-primary" onClick={testTts} disabled={ttsBusy}>{ttsBusy ? "…" : "Stimme testen"}</button>
+        </div>
+        {tts && (
+          <div className={`mt-3 rounded-xl p-3 border text-sm ${tts.ok ? "border-good/50 bg-good/10" : "border-bad/40 bg-bad/10"}`}>
+            <p className="font-medium">{tts.ok ? `✓ Funktioniert (Anbieter: ${tts.provider}${tts.voice ? ", " + tts.voice : ""})` : `✗ Fehler (Anbieter: ${tts.provider || "?"})`}</p>
+            {tts.status && <p className="text-muted">Status {tts.status}</p>}
+            {tts.message && <p className="text-muted">{tts.message}</p>}
+            {tts.hinweis && <p className="text-warn mt-1">→ {tts.hinweis}</p>}
+          </div>
+        )}
+      </div>
 
       <div className="card p-5">
         <div className="flex items-center justify-between">

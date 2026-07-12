@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { VocabSetup } from "@/components/VocabSetup";
 
 interface Progress {
   band: string;
@@ -11,6 +12,7 @@ interface Progress {
   masteredStable: number;
   dueNow: number;
   recommendations: string[];
+  vocabTotal: number;
 }
 
 const MODULES: [string, string, string][] = [
@@ -41,6 +43,10 @@ export default function Dashboard() {
           <p className="text-xl font-semibold text-primary">{p?.band ?? "…"}</p>
         </div>
       </div>
+
+      {p && p.vocabTotal === 0 && (
+        <VocabSetup onDone={() => fetch("/api/progress").then((r) => r.json()).then(setP)} />
+      )}
 
       <div className="grid sm:grid-cols-3 gap-3">
         <Stat label="Fällige Wiederholungen" value={p?.dueNow ?? 0} href="/vokabeln" />

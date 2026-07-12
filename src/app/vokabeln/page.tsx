@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { speak } from "@/lib/speech/client";
+import { VocabSetup } from "@/components/VocabSetup";
 
 interface Card {
   id: string; lemma: string; pos: string; meaningDe: string; explanationEs: string;
@@ -17,13 +18,17 @@ export default function Vokabeln() {
   const [revealed, setRevealed] = useState(false);
   const [result, setResult] = useState<null | { correct: boolean; mastery?: any; errorType?: string }>(null);
   const [done, setDone] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const startRef = useRef<number>(Date.now());
 
   useEffect(() => { load(); }, []);
   async function load() {
-    const r = await fetch("/api/vocab?limit=12").then((x) => x.json());
-    setCards(r.cards || []);
-    setI(0); setDone(false); reset();
+    setLoaded(false);
+    try {
+      const r = await fetch("/api/vocab?limit=12").then((x) => x.json());
+      setCards(r.cards || []);
+    } catch { setCards([]); }
+    setI(0); setDone(false); reset(); setLoaded(true);
   }
   function reset() { setAnswer(""); setRevealed(false); setResult(null); startRef.current = Date.now(); }
 
@@ -35,22 +40,26 @@ export default function Vokabeln() {
     return a.length > 1 && (norm(card.lemma).includes(a) || a.includes(norm(card.lemma)));
   }, [answer, card]);
 
-  async function check() {
+  function check() {
     if (!card) return;
-    setRevealed(true);
     const correct = isCorrect;
     const responseMs = Date.now() - startRef.current;
     const evidence = card._review ? "reproduced" : "recognized";
-    const res = await fetch("/api/attempts", {
+    // Ergebnis SOFORT anzeigen (unabhängig vom Server), Speichern im Hintergrund.
+    setRevealed(true);
+    setResult({ correct });
+    speak(card.lemma);
+    fetch("/api/attempts", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
         mode: "vokabeln", exerciseType: "uebersetzung", vocabId: card.id,
         prompt: card.meaningDe, expected: card.lemma, answer, correct,
         confidence: correct ? 0.85 : 0.5, responseMs, evidence, dimension: "vocabBreadth",
       }),
-    }).then((x) => x.json());
-    setResult({ correct, mastery: res.mastery, errorType: res.errorType });
-    speak(card.lemma);
+    })
+      .then((x) => x.json())
+      .then((res) => setResult({ correct, mastery: res.mastery, errorType: res.errorType }))
+      .catch(() => {});
   }
 
   function next() {
@@ -68,7 +77,14 @@ export default function Vokabeln() {
       </div>
     </div>
   );
-  if (!card) return <p className="label">Lädt Vokabeln…</p>;
+  if (!loaded) return <p className="label">Lädt Vokabeln…</p>;
+  if (!card) return (
+    <div className="max-w-xl mx-auto space-y-4">
+      <h1 className="h-title">Vokabeln</h1>
+      <p className="label">Es sind noch keine Vokabeln in der Datenbank. Lade sie einmalig:</p>
+      <VocabSetup onDone={load} />
+    </div>
+  );
 
   return (
     <div className="max-w-xl mx-auto">
