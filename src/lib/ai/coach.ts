@@ -39,7 +39,13 @@ Gib striktes JSON zurueck mit Feldern: reply, correction, ruleHint, goodExample.
 export async function runCoach(ctx: CoachContext): Promise<CoachResult> {
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
 
+  if (geminiKey) {
+    try {
+      return await viaGemini(ctx, geminiKey);
+    } catch (e) {}
+  }
   if (anthropicKey) {
     try {
       return await viaAnthropic(ctx, anthropicKey);
@@ -53,6 +59,35 @@ export async function runCoach(ctx: CoachContext): Promise<CoachResult> {
     } catch (e) {}
   }
   return ruleCoach(ctx);
+}
+
+// Google Gemini (kostenloser Free-Tier über Google AI Studio).
+async function viaGemini(ctx: CoachContext, key: string): Promise<CoachResult> {
+  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM }] },
+        contents: [{ role: "user", parts: [{ text: JSON.stringify({ szenario: ctx.scenarioTitle, aufgabe: ctx.stepPromptDe, zielphrasen: ctx.targetsEs, niveau: ctx.level, gedaechtnis: ctx.memory, nutzer_sagte: ctx.userSaid }) }] }],
+        generationConfig: { responseMimeType: "application/json" },
+      }),
+    }
+  );
+  if (!res.ok) throw new Error("gemini " + res.status);
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+  const parsed = safeJson(text);
+  return {
+    reply: parsed.reply || "Vale, sigamos.",
+    correction: parsed.correction,
+    ruleHint: parsed.ruleHint,
+    goodExample: parsed.goodExample,
+    matchedTargets: matched(ctx),
+    provider: "gemini",
+  };
 }
 
 async function viaAnthropic(ctx: CoachContext, key: string): Promise<CoachResult> {

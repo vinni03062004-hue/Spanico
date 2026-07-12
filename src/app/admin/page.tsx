@@ -31,6 +31,17 @@ export default function Admin() {
       offset = r.nextOffset;
     }
   }
+  // KI-Übersetzung der kompletten 10.000-Wörter-Liste (braucht Gemini- oder Anthropic-Key).
+  async function enrichAll() {
+    setImp({ running: true, processed: 0, available: 10000, total: d?.vocabCount ?? 0 });
+    let offset: number | null = 0;
+    while (offset !== null) {
+      const r: any = await fetch(`/api/enrich?offset=${offset}`, { method: "POST" }).then((x) => x.json());
+      if (r.error) { setImp((s) => s && { ...s, running: false }); setSeedMsg("Fehler: " + r.error); return; }
+      setImp({ running: !r.done, processed: r.processed, available: r.available, total: r.total });
+      offset = r.nextOffset;
+    }
+  }
   return (
     <div className="space-y-4">
       <h1 className="h-title">Admin & Debug</h1>
@@ -53,6 +64,16 @@ export default function Admin() {
             {tts.hinweis && <p className="text-warn mt-1">→ {tts.hinweis}</p>}
           </div>
         )}
+      </div>
+
+      <div className="card p-5 border-accent/40">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium">Alle 10.000 Wörter übersetzen (KI)</p>
+            <p className="label">Übersetzt die komplette Frequenzliste automatisch ins Deutsche. Braucht einen Gemini- oder Anthropic-Key. Läuft einige Minuten, dann dauerhaft gespeichert.</p>
+          </div>
+          <button className="btn btn-primary" onClick={enrichAll} disabled={imp?.running}>{imp?.running ? "…" : "Alle übersetzen"}</button>
+        </div>
       </div>
 
       <div className="card p-5">

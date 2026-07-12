@@ -32,7 +32,7 @@ export default function Hoeren() {
       <div className="flex justify-between items-center"><h1 className="h-title">Hören</h1><span className="chip">{i + 1}/{ITEMS.length}</span></div>
       <div className="card p-6 space-y-4">
         <div className="flex items-center gap-3 justify-center">
-          <button className="btn btn-primary" onClick={() => speak(item.es, { provider: "browser" })}>🔊 Anhören</button>
+          <button className="btn btn-primary" onClick={() => speak(item.es)}>🔊 Anhören</button>
           <label className="label flex items-center gap-2">Tempo
             <input type="range" min={0.6} max={1.2} step={0.1} value={rate} onChange={(e) => setRate(+e.target.value)} />
           </label>

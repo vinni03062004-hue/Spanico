@@ -1,6 +1,8 @@
 // Seed-Wortschatz mit vollstaendigen Feldern gemaess Spezifikation.
 // In Schichten aufgebaut (kern, alltagsphrasen, thematisch, kollokation,
 // satzbaustein, situativ). Erweiterbar: einfach Eintraege ergaenzen und neu seeden.
+import { FREQ_WORDS } from "./es_freq";
+import { FREQ_WORDS2 } from "./es_freq2";
 
 export interface SeedVocab {
   lemma: string;
@@ -195,21 +197,127 @@ const COMPACT: Row[] = [
   ["de nada", "locución", "gern geschehen", 1, "hoeflichkeit"],
   ["claro", "adverbio", "klar / natürlich", 1, "gespraech"],
   ["por supuesto", "locución", "selbstverständlich", 2, "gespraech"],
+
+  // --- Farben ---
+  ["rojo", "adjetivo", "rot", 2, "farben"], ["azul", "adjetivo", "blau", 2, "farben"],
+  ["verde", "adjetivo", "grün", 2, "farben"], ["amarillo", "adjetivo", "gelb", 2, "farben"],
+  ["negro", "adjetivo", "schwarz", 2, "farben"], ["blanco", "adjetivo", "weiß", 2, "farben"],
+  ["gris", "adjetivo", "grau", 3, "farben"], ["marrón", "adjetivo", "braun", 3, "farben"],
+  ["naranja", "adjetivo", "orange", 3, "farben"], ["rosa", "adjetivo", "rosa", 3, "farben"],
+  // --- Essen & Trinken ---
+  ["comida", "sustantivo", "Essen / Mahlzeit", 1, "essen_trinken"], ["fruta", "sustantivo", "Obst", 2, "essen_trinken"],
+  ["manzana", "sustantivo", "Apfel", 2, "essen_trinken"], ["naranja", "sustantivo", "Orange", 2, "essen_trinken"],
+  ["plátano", "sustantivo", "Banane", 3, "essen_trinken"], ["tomate", "sustantivo", "Tomate", 3, "essen_trinken"],
+  ["patata", "sustantivo", "Kartoffel", 3, "essen_trinken"], ["arroz", "sustantivo", "Reis", 2, "essen_trinken"],
+  ["huevo", "sustantivo", "Ei", 2, "essen_trinken"], ["queso", "sustantivo", "Käse", 2, "essen_trinken"],
+  ["azúcar", "sustantivo", "Zucker", 2, "essen_trinken"], ["sal", "sustantivo", "Salz", 2, "essen_trinken"],
+  ["aceite", "sustantivo", "Öl", 3, "essen_trinken"], ["sopa", "sustantivo", "Suppe", 3, "essen_trinken"],
+  ["ensalada", "sustantivo", "Salat", 3, "essen_trinken"], ["postre", "sustantivo", "Nachtisch", 3, "essen_trinken"],
+  ["té", "sustantivo", "Tee", 2, "essen_trinken"], ["zumo", "sustantivo", "Saft", 3, "essen_trinken"],
+  ["hambre", "sustantivo", "Hunger", 2, "essen_trinken"], ["sed", "sustantivo", "Durst", 2, "essen_trinken"],
+  ["rico", "adjetivo", "lecker / reich", 2, "essen_trinken"], ["dulce", "adjetivo", "süß", 3, "essen_trinken"],
+  // --- Körper & Gesundheit ---
+  ["cara", "sustantivo", "Gesicht", 2, "koerper"], ["pelo", "sustantivo", "Haar", 2, "koerper"],
+  ["oreja", "sustantivo", "Ohr", 3, "koerper"], ["nariz", "sustantivo", "Nase", 3, "koerper"],
+  ["boca", "sustantivo", "Mund", 2, "koerper"], ["diente", "sustantivo", "Zahn", 3, "koerper"],
+  ["brazo", "sustantivo", "Arm", 2, "koerper"], ["pierna", "sustantivo", "Bein", 2, "koerper"],
+  ["espalda", "sustantivo", "Rücken", 3, "koerper"], ["corazón", "sustantivo", "Herz", 2, "koerper"],
+  ["estómago", "sustantivo", "Magen / Bauch", 3, "koerper"], ["salud", "sustantivo", "Gesundheit", 2, "gesundheit"],
+  ["dolor", "sustantivo", "Schmerz", 2, "gesundheit"], ["fiebre", "sustantivo", "Fieber", 3, "gesundheit"],
+  ["medicina", "sustantivo", "Medizin", 3, "gesundheit"], ["farmacia", "sustantivo", "Apotheke", 2, "gesundheit"],
+  ["hospital", "sustantivo", "Krankenhaus", 2, "gesundheit"], ["cita", "sustantivo", "Termin", 3, "gesundheit"],
+  // --- Kleidung ---
+  ["ropa", "sustantivo", "Kleidung", 2, "kleidung"], ["camisa", "sustantivo", "Hemd", 3, "kleidung"],
+  ["pantalón", "sustantivo", "Hose", 3, "kleidung"], ["zapato", "sustantivo", "Schuh", 2, "kleidung"],
+  ["vestido", "sustantivo", "Kleid", 3, "kleidung"], ["chaqueta", "sustantivo", "Jacke", 3, "kleidung"],
+  ["abrigo", "sustantivo", "Mantel", 3, "kleidung"], ["gafas", "sustantivo", "Brille", 3, "kleidung"],
+  ["talla", "sustantivo", "Größe (Kleidung)", 3, "kleidung"], ["color", "sustantivo", "Farbe", 2, "kleidung"],
+  // --- Haus & Wohnen ---
+  ["cocina", "sustantivo", "Küche", 2, "wohnen"], ["dormitorio", "sustantivo", "Schlafzimmer", 3, "wohnen"],
+  ["cama", "sustantivo", "Bett", 2, "wohnen"], ["sofá", "sustantivo", "Sofa", 3, "wohnen"],
+  ["llave", "sustantivo", "Schlüssel", 2, "wohnen"], ["luz", "sustantivo", "Licht", 2, "wohnen"],
+  ["suelo", "sustantivo", "Boden", 3, "wohnen"], ["pared", "sustantivo", "Wand", 3, "wohnen"],
+  ["jardín", "sustantivo", "Garten", 3, "wohnen"], ["edificio", "sustantivo", "Gebäude", 3, "wohnen"],
+  ["alquiler", "sustantivo", "Miete", 3, "wohnen"], ["vecino", "sustantivo", "Nachbar", 3, "wohnen"],
+  // --- Stadt & Orte ---
+  ["tienda", "sustantivo", "Laden / Geschäft", 2, "orte"], ["mercado", "sustantivo", "Markt", 2, "orte"],
+  ["banco", "sustantivo", "Bank", 2, "orte"], ["iglesia", "sustantivo", "Kirche", 3, "orte"],
+  ["parque", "sustantivo", "Park", 2, "orte"], ["playa", "sustantivo", "Strand", 2, "orte"],
+  ["restaurante", "sustantivo", "Restaurant", 2, "orte"], ["bar", "sustantivo", "Bar / Kneipe", 2, "orte"],
+  ["aeropuerto", "sustantivo", "Flughafen", 2, "reise"], ["museo", "sustantivo", "Museum", 3, "orte"],
+  ["centro", "sustantivo", "Zentrum", 2, "orte"], ["pueblo", "sustantivo", "Dorf", 3, "orte"],
+  ["plaza", "sustantivo", "Platz", 2, "orte"], ["esquina", "sustantivo", "Ecke", 3, "orte"],
+  // --- Reise & Verkehr ---
+  ["viaje", "sustantivo", "Reise", 2, "reise"], ["maleta", "sustantivo", "Koffer", 3, "reise"],
+  ["mapa", "sustantivo", "Karte / Landkarte", 2, "reise"], ["metro", "sustantivo", "U-Bahn", 2, "reise"],
+  ["taxi", "sustantivo", "Taxi", 2, "reise"], ["bicicleta", "sustantivo", "Fahrrad", 3, "reise"],
+  ["camino", "sustantivo", "Weg", 2, "reise"], ["puente", "sustantivo", "Brücke", 3, "reise"],
+  ["recto", "adverbio", "geradeaus", 2, "orientierung"], ["cerca de", "locución", "in der Nähe von", 2, "orientierung"],
+  // --- Natur & Wetter ---
+  ["sol", "sustantivo", "Sonne", 2, "natur"], ["lluvia", "sustantivo", "Regen", 2, "natur"],
+  ["viento", "sustantivo", "Wind", 3, "natur"], ["nieve", "sustantivo", "Schnee", 3, "natur"],
+  ["calor", "sustantivo", "Hitze / Wärme", 2, "natur"], ["frío", "sustantivo", "Kälte", 2, "natur"],
+  ["cielo", "sustantivo", "Himmel", 3, "natur"], ["mar", "sustantivo", "Meer", 2, "natur"],
+  ["montaña", "sustantivo", "Berg", 3, "natur"], ["río", "sustantivo", "Fluss", 3, "natur"],
+  ["árbol", "sustantivo", "Baum", 3, "natur"], ["flor", "sustantivo", "Blume", 3, "natur"],
+  ["animal", "sustantivo", "Tier", 2, "natur"], ["perro", "sustantivo", "Hund", 2, "natur"],
+  ["gato", "sustantivo", "Katze", 2, "natur"], ["tiempo", "sustantivo", "Wetter / Zeit", 1, "natur"],
+  // --- Beruf & Arbeit ---
+  ["oficina", "sustantivo", "Büro", 2, "arbeit"], ["jefe", "sustantivo", "Chef", 3, "arbeit"],
+  ["reunión", "sustantivo", "Besprechung", 3, "arbeit"], ["empresa", "sustantivo", "Firma", 3, "arbeit"],
+  ["sueldo", "sustantivo", "Gehalt", 3, "arbeit"], ["profesor", "sustantivo", "Lehrer", 2, "arbeit"],
+  ["médico", "sustantivo", "Arzt", 2, "arbeit"], ["camarero", "sustantivo", "Kellner", 3, "arbeit"],
+  ["policía", "sustantivo", "Polizei / Polizist", 3, "arbeit"], ["estudiante", "sustantivo", "Student/in", 2, "arbeit"],
+  // --- Gefühle & Adjektive ---
+  ["feliz", "adjetivo", "glücklich", 2, "adjektive"], ["enfadado", "adjetivo", "wütend", 3, "adjektive"],
+  ["nervioso", "adjetivo", "nervös", 3, "adjektive"], ["tranquilo", "adjetivo", "ruhig", 2, "adjektive"],
+  ["ocupado", "adjetivo", "beschäftigt", 3, "adjektive"], ["libre", "adjetivo", "frei", 2, "adjektive"],
+  ["listo", "adjetivo", "fertig / schlau", 2, "adjektive"], ["fuerte", "adjetivo", "stark", 2, "adjektive"],
+  ["débil", "adjetivo", "schwach", 3, "adjektive"], ["lleno", "adjetivo", "voll", 3, "adjektive"],
+  ["vacío", "adjetivo", "leer", 3, "adjektive"], ["limpio", "adjetivo", "sauber", 3, "adjektive"],
+  ["sucio", "adjetivo", "schmutzig", 3, "adjektive"], ["peligroso", "adjetivo", "gefährlich", 3, "adjektive"],
+  ["seguro", "adjetivo", "sicher", 2, "adjektive"], ["posible", "adjetivo", "möglich", 2, "adjektive"],
+  // --- Mehr Verben ---
+  ["gustar", "verbo", "gefallen / mögen", 1, "verben"], ["encantar", "verbo", "sehr gefallen", 2, "verben"],
+  ["preguntar", "verbo", "fragen", 2, "verben"], ["contestar", "verbo", "antworten", 2, "verben"],
+  ["comprar", "verbo", "kaufen", 1, "verben"], ["vender", "verbo", "verkaufen", 2, "verben"],
+  ["buscar", "verbo", "suchen", 1, "verben"], ["encontrar", "verbo", "finden", 1, "verben"],
+  ["perder", "verbo", "verlieren", 2, "verben"], ["ganar", "verbo", "gewinnen / verdienen", 2, "verben"],
+  ["cambiar", "verbo", "ändern / wechseln", 2, "verben"], ["usar", "verbo", "benutzen", 2, "verben"],
+  ["viajar", "verbo", "reisen", 1, "verben"], ["cocinar", "verbo", "kochen", 2, "verben"],
+  ["limpiar", "verbo", "putzen", 2, "verben"], ["descansar", "verbo", "sich ausruhen", 2, "verben"],
+  ["recordar", "verbo", "sich erinnern", 2, "verben"], ["olvidar", "verbo", "vergessen", 2, "verben"],
+  ["ayudar", "verbo", "helfen", 1, "verben"], ["mostrar", "verbo", "zeigen", 2, "verben"],
+  ["intentar", "verbo", "versuchen", 2, "verben"], ["conseguir", "verbo", "erreichen / schaffen", 2, "verben"],
+  ["explicar", "verbo", "erklären", 2, "verben"], ["preparar", "verbo", "vorbereiten", 2, "verben"],
+  ["pagar", "verbo", "bezahlen", 1, "verben"], ["reservar", "verbo", "reservieren", 2, "verben"],
+  // --- Zeit & häufige Ausdrücke ---
+  ["antes", "adverbio", "vorher / früher", 2, "zeit"], ["después", "adverbio", "nachher / danach", 2, "zeit"],
+  ["temprano", "adverbio", "früh", 2, "zeit"], ["tarde", "adverbio", "spät", 2, "zeit"],
+  ["pronto", "adverbio", "bald", 2, "zeit"], ["a veces", "locución", "manchmal", 2, "zeit"],
+  ["a menudo", "locución", "oft", 3, "zeit"], ["ahora mismo", "locución", "genau jetzt", 2, "zeit"],
+  ["otra vez", "locución", "noch einmal", 2, "gespraech"], ["en seguida", "locución", "sofort", 3, "gespraech"],
+  ["¿verdad?", "locución", "oder? / stimmt's?", 2, "gespraech"], ["depende", "verbo", "kommt darauf an", 2, "gespraech"],
+  ["me gustaría", "locución", "ich würde gern", 2, "gespraech"], ["tengo que", "locución", "ich muss", 1, "gespraech"],
+  ["hay que", "locución", "man muss", 2, "gespraech"], ["está bien", "locución", "in Ordnung / passt", 1, "gespraech"],
 ];
 
-// COMPACT-Zeilen in vollständige SeedVocab-Einträge umwandeln.
-const EXPANDED: SeedVocab[] = COMPACT.map(([lemma, pos, meaningDe, tier, category]) => ({
+// Kompakt-Tupel in vollständige SeedVocab-Einträge umwandeln.
+const toEntry = ([lemma, pos, meaningDe, tier, category]: [string, string, string, number, string]): SeedVocab => ({
   lemma, pos, meaningDe,
   explanationEs: "",
   examples: [],
   category,
   frequencyTier: tier,
   layer: tier <= 1 ? "kern" : tier <= 2 ? "thematisch" : "fortgeschritten",
-}));
+});
+const EXPANDED: SeedVocab[] = COMPACT.map(toEntry);
+const FREQ: SeedVocab[] = [...FREQ_WORDS, ...FREQ_WORDS2].map(toEntry);
 
-// Zusammenführen; RICH (mit voller Datentiefe) hat Vorrang bei doppelten Lemmata.
-const richLemmas = new Set(RICH.map((r) => r.lemma));
-export const VOCABULARY: SeedVocab[] = [
-  ...RICH,
-  ...EXPANDED.filter((e) => !richLemmas.has(e.lemma)),
-];
+// Zusammenführen und doppelte Lemmata entfernen; RICH (volle Datentiefe) hat Vorrang.
+const seen = new Set<string>();
+export const VOCABULARY: SeedVocab[] = [...RICH, ...EXPANDED, ...FREQ].filter((e) => {
+  if (seen.has(e.lemma)) return false;
+  seen.add(e.lemma);
+  return true;
+});

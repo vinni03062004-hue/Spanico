@@ -99,6 +99,8 @@ export default function Jarvis() {
       if (running) setState("listening");
     } catch {
       setState("error");
+      setTranscript((t) => [...t, { role: "coach", text: "(Keine Antwort vom Server — Datenbank verbunden? Für echte freie Gespräche einen KI-Key setzen.)" }]);
+      if (running) setState("listening");
     }
   }
 
