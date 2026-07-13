@@ -24,6 +24,14 @@ export default function Admin() {
     catch { setTts({ ok: false, message: "Anfrage fehlgeschlagen" }); }
     setTtsBusy(false);
   }
+  const [img, setImg] = useState<any>(null);
+  const [imgBusy, setImgBusy] = useState(false);
+  async function testImage() {
+    setImgBusy(true); setImg(null);
+    try { setImg(await fetch("/api/image/test").then((r) => r.json())); }
+    catch { setImg({ ok: false, message: "Anfrage fehlgeschlagen" }); }
+    setImgBusy(false);
+  }
   async function seed() {
     let offset: number | null = 0;
     try {
@@ -117,6 +125,21 @@ export default function Admin() {
             {tts.status && <p className="text-muted">Status {tts.status}</p>}
             {tts.message && <p className="text-muted">{tts.message}</p>}
             {tts.hinweis && <p className="text-warn mt-1">→ {tts.hinweis}</p>}
+          </div>
+        )}
+      </div>
+
+      <div className="card p-5">
+        <div className="flex items-center justify-between">
+          <div><p className="font-medium">KI-Bildgenerierung testen</p><p className="label">Prüft, ob echte Bilder erzeugt werden können — sonst mit genauem Grund.</p></div>
+          <button className="btn btn-primary" onClick={testImage} disabled={imgBusy}>{imgBusy ? "…" : "Bild testen"}</button>
+        </div>
+        {img && (
+          <div className={`mt-3 rounded-xl p-3 border text-sm ${img.ok ? "border-good/50 bg-good/10" : "border-bad/40 bg-bad/10"}`}>
+            <p className="font-medium">{img.ok ? "✓ Bildgenerierung funktioniert" : "✗ Bildgenerierung nicht möglich"}</p>
+            {img.status && <p className="text-muted">Status {img.status} · {img.model}</p>}
+            {img.message && <p className="text-muted">{img.message}</p>}
+            {img.hinweis && <p className="text-warn mt-1">→ {img.hinweis}</p>}
           </div>
         )}
       </div>

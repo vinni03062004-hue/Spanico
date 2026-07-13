@@ -44,11 +44,15 @@ export async function GET(req: NextRequest) {
         generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
       }),
     });
-    if (!res.ok) return new NextResponse(null, { status: 404 });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error("[image] Gemini", res.status, body.slice(0, 300));
+      return new NextResponse(null, { status: 404 });
+    }
     const data = await res.json();
     const parts = data?.candidates?.[0]?.content?.parts || [];
     const img = parts.find((p: any) => p.inlineData?.data);
-    if (!img) return new NextResponse(null, { status: 404 });
+    if (!img) { console.error("[image] kein Bild in Antwort"); return new NextResponse(null, { status: 404 }); }
 
     const buf = Buffer.from(img.inlineData.data, "base64");
     const ct = img.inlineData.mimeType || "image/png";

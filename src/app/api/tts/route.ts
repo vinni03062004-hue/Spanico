@@ -41,7 +41,10 @@ export async function POST(req: NextRequest) {
     await prisma.audioCache.create({
       data: { key, contentType: res.contentType, data: res.audio, chars: text.length },
     });
-  } catch { /* Duplikat/Tabelle fehlt -> ignorieren */ }
+  } catch (e: any) {
+    // Fehler protokollieren (z. B. Tabelle fehlt) statt still zu schlucken.
+    console.error("[tts] AudioCache-Schreibfehler:", e?.message || e);
+  }
 
   return new NextResponse(res.audio, { headers: { "content-type": res.contentType, "x-cache": "miss", "x-provider": res.provider } });
 }
