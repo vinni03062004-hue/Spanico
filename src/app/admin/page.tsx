@@ -137,8 +137,10 @@ export default function Admin() {
         {img && (
           <div className={`mt-3 rounded-xl p-3 border text-sm ${img.ok ? "border-good/50 bg-good/10" : "border-bad/40 bg-bad/10"}`}>
             <p className="font-medium">{img.ok ? "✓ Bildgenerierung funktioniert" : "✗ Bildgenerierung nicht möglich"}</p>
-            {img.status && <p className="text-muted">Status {img.status} · {img.model}</p>}
+            {img.status ? <p className="text-muted">Status {img.status}</p> : null}
+            {img.model && <p className="text-muted">Modell: {img.model}</p>}
             {img.message && <p className="text-muted">{img.message}</p>}
+            {img.verfuegbareBildmodelle?.length ? <p className="text-muted">Verfügbar: {img.verfuegbareBildmodelle.join(", ")}</p> : null}
             {img.hinweis && <p className="text-warn mt-1">→ {img.hinweis}</p>}
           </div>
         )}

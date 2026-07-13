@@ -32,27 +32,32 @@ export async function GET(req: NextRequest) {
   const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
   if (!key) return new NextResponse(null, { status: 404 });
 
-  const model = process.env.GEMINI_IMAGE_MODEL || "gemini-2.0-flash-preview-image-generation";
+  // Mehrere mögliche Bildmodelle durchprobieren (Namen ändern sich bei Google).
+  const models = [process.env.GEMINI_IMAGE_MODEL, "gemini-2.5-flash-image", "gemini-2.5-flash-image-preview", "gemini-2.0-flash-preview-image-generation"].filter(Boolean) as string[];
   const prompt = `Eine einfache, klare, farbige Illustration von: ${meaning || word} ("${word}" auf Spanisch). Kindgerechter, freundlicher Stil, ein einzelnes zentrales Motiv, schlichter heller Hintergrund, KEIN Text, keine Buchstaben.`;
 
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      console.error("[image] Gemini", res.status, body.slice(0, 300));
-      return new NextResponse(null, { status: 404 });
+    let img: any = null;
+    for (const model of models) {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        console.error("[image]", model, res.status, body.slice(0, 200));
+        continue; // nächstes Modell versuchen
+      }
+      const data = await res.json();
+      const parts = data?.candidates?.[0]?.content?.parts || [];
+      img = parts.find((p: any) => p.inlineData?.data);
+      if (img) break;
     }
-    const data = await res.json();
-    const parts = data?.candidates?.[0]?.content?.parts || [];
-    const img = parts.find((p: any) => p.inlineData?.data);
-    if (!img) { console.error("[image] kein Bild in Antwort"); return new NextResponse(null, { status: 404 }); }
+    if (!img) { return new NextResponse(null, { status: 404 }); }
 
     const buf = Buffer.from(img.inlineData.data, "base64");
     const ct = img.inlineData.mimeType || "image/png";
