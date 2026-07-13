@@ -44,6 +44,9 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {p && p.vocabTotal > 0 && (
+        <p className="text-sm text-primary">📚 {p.vocabTotal.toLocaleString("de-DE")} Wörter aktuell in deiner Datenbank (Kern + übersetzte).</p>
+      )}
       <VocabSetup onDone={() => fetch("/api/progress").then((r) => r.json()).then(setP)} />
       {p && p.vocabTotal === 0 && (
         <p className="text-warn text-sm">Noch keine Wörter geladen — klick oben „Grundwortschatz laden".</p>

@@ -25,9 +25,15 @@ export default function Admin() {
     setTtsBusy(false);
   }
   async function seed() {
-    setSeedMsg("…");
-    const r = await fetch("/api/seed", { method: "POST" }).then((x) => x.json());
-    setSeedMsg(`Vokabeln gesamt: ${r.gesamt}, Szenarien: ${r.szenarien}`);
+    let offset: number | null = 0;
+    try {
+      while (offset !== null) {
+        const r: any = await fetch(`/api/seed?offset=${offset}`, { method: "POST" }).then((x) => x.json());
+        setSeedMsg(`${Math.round((r.processed / r.available) * 100)}% (${r.phase}) …`);
+        offset = r.nextOffset;
+        if (r.done) setSeedMsg(`Fertig — ${r.gesamt} Vokabeln in der Datenbank.`);
+      }
+    } catch { setSeedMsg("Fehler — bitte erneut versuchen."); }
   }
   // Einmaliger Import der ~21.000 FreeDict-Wörter, blockweise mit Fortschritt.
   // Landet dauerhaft in Neon — danach nie wieder nötig.

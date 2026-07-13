@@ -66,7 +66,7 @@ export const EMOJI_MAP: Record<string, string> = {
   sangre2: "🩸", diente2: "🦷", esqueleto: "💀", fantasma: "👻", robot: "🤖", extraterrestre: "👽",
   árbol2: "🌲", hoja: "🍁", cactus: "🌵", seta: "🍄", trébol: "🍀", rosa2: "🌹",
   tulipán: "🌷", girasol: "🌻", semilla: "🌱", tierra2: "🌍", volcán: "🌋", desierto: "🏜️",
-  puente2: "🌉", castillo: "🏰", faro: "🗼", fábrica: "🏭", granja: "🏡", carpa: "🎪",
+  puente2: "🌉", castillo: "🏰", fábrica: "🏭", granja: "🏡", carpa: "🎪",
   // Berufe & Personen
   bombero: "🧑‍🚒", cocinero: "🧑‍🍳", agricultor: "🧑‍🌾", científico: "🧑‍🔬", juez: "🧑‍⚖️",
   cantante: "🧑‍🎤", pintor: "🧑‍🎨", piloto: "🧑‍✈️", astronauta: "🧑‍🚀", enfermera: "🧑‍⚕️",
@@ -83,17 +83,17 @@ export const EMOJI_MAP: Record<string, string> = {
   fideos: "🍜", sushi: "🍣", gamba: "🦐", ostra: "🦪", croissant: "🥐", baguette: "🥖",
   panqueque: "🥞", donut: "🍩", cupcake: "🧁", flan: "🍮", palomitas: "🍿", nuez: "🌰",
   aguacate: "🥑", brócoli: "🥦", pepino: "🥒", chile: "🌶️", castaña: "🌰", pera: "🍐",
-  mango: "🥭", kiwi: "🥝", frambuesa: "🫐", cóctel: "🍸", whisky: "🥃", champán: "🍾",
+  mango: "🥭", kiwi: "🥝", cóctel: "🍸", whisky: "🥃", champán: "🍾",
   // Natur & Wetter erweitert
   arcoíris: "🌈", relámpago: "⚡", gota: "💧", ola: "🌊", cascada: "🏞️", cueva: "🕳️",
   seta2: "🍄", palmera: "🌴", bambú: "🎋", roca: "🪨", concha: "🐚", pluma: "🪶",
   // Gegenstände erweitert
   llavero: "🔑", monedero: "👛", mochila: "🎒", maletín: "💼", paraguas2: "🌂",
   gorra: "🧢", corbata: "👔", bufanda: "🧣", guante: "🧤", calcetín: "🧦", bikini: "👙",
-  reloj3: "🕰️", balanza: "⚖️", termostato: "🌡️", ventilador: "🌀", lámpara: "🪔",
+  reloj3: "🕰️", balanza: "⚖️", lámpara: "🪔",
   llave4: "🗝️", trofeo2: "🏆", diamante: "💎", moneda: "🪙", billete2: "💵", tarjeta: "💳",
   // Musik & Kunst
-  saxofón: "🎷", acordeón: "🪗", banjo: "🪕", maracas: "🪇", arpa: "🎼", nota: "🎶",
+  saxofón: "🎷", acordeón: "🪗", banjo: "🪕", maracas: "🪇", nota: "🎶",
   pincel: "🖌️", paleta: "🎨", marco: "🖼️", teatro: "🎭", cine: "🎬", entrada: "🎟️",
   // Transport erweitert
   tractor: "🚜", grúa: "🏗️", tren2: "🚂", tranvía: "🚊", helicóptero: "🚁", cohete2: "🚀",
