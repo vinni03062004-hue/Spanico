@@ -3,6 +3,7 @@
 // satzbaustein, situativ). Erweiterbar: einfach Eintraege ergaenzen und neu seeden.
 import { FREQ_WORDS } from "./es_freq";
 import { FREQ_WORDS2 } from "./es_freq2";
+import { EMOJI_MAP } from "./emojiMap";
 
 export interface SeedVocab {
   lemma: string;
@@ -310,6 +311,7 @@ const toEntry = ([lemma, pos, meaningDe, tier, category]: [string, string, strin
   category,
   frequencyTier: tier,
   layer: tier <= 1 ? "kern" : tier <= 2 ? "thematisch" : "fortgeschritten",
+  imageEmoji: EMOJI_MAP[lemma] || undefined, // Bildanker, wenn konkreter Begriff
 });
 const EXPANDED: SeedVocab[] = COMPACT.map(toEntry);
 const FREQ: SeedVocab[] = [...FREQ_WORDS, ...FREQ_WORDS2].map(toEntry);

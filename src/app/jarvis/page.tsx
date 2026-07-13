@@ -101,8 +101,9 @@ export default function Jarvis() {
 
   async function handleUser(text: string, conf: number) {
     if (!running) return;
-    // Sperre gegen Doppel-Verarbeitung (Stille-Timer + evtl. spätes "final").
-    if (speakingRef.current || processingRef.current) return;
+    // Sperre nur gegen Doppel-Verarbeitung (Echo ist über die Stummschaltung
+    // abgedeckt); NICHT an speakingRef koppeln, damit nichts hängen bleibt.
+    if (processingRef.current) return;
     processingRef.current = true;
     setTranscript((t) => [...t, { role: "user", text }]);
     setState("thinking");
@@ -187,6 +188,7 @@ export default function Jarvis() {
         </div>
         {!supported && <p className="text-bad text-sm text-center mb-2">Dein Browser unterstützt die Spracherkennung nicht. Nutze Chrome/Edge (Desktop/Android) oder den Aussprache-Modus.</p>}
         {notice && <p className="text-warn text-sm text-center mb-2">{notice}</p>}
+        <p className="text-[10px] text-muted/60 text-center mb-1">Version: Stille-Erkennung aktiv (v3)</p>
         <div className="flex gap-2 justify-center">
           {!running ? (
             <button className="btn btn-primary px-8" onClick={start}>● Gespräch starten</button>

@@ -111,6 +111,9 @@ export interface SpeakOptions {
 // Spricht Text. Versucht zuerst Server-Premium-Audio (menschlich, gecacht),
 // faellt bei Fehlen/Fehler auf die beste Browser-Stimme zurueck.
 export async function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
+  // Sicherheits-Zeitlimit: die Stimme darf NIE dauerhaft haengen bleiben,
+  // sonst blockiert der Sprachmodus. Grob nach Textlaenge geschaetzt.
+  const maxMs = Math.min(25000, Math.max(4000, text.length * 90 + 2500));
   if (opts.provider !== "browser") {
     try {
       const res = await fetch("/api/tts", {
@@ -125,9 +128,12 @@ export async function speak(text: string, opts: SpeakOptions = {}): Promise<void
         const audio = new Audio(url);
         opts.onStart?.();
         await new Promise<void>((resolve) => {
-          audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
-          audio.onerror = () => resolve();
-          audio.play().catch(() => resolve());
+          let done = false;
+          const finish = () => { if (done) return; done = true; try { URL.revokeObjectURL(url); } catch {} resolve(); };
+          audio.onended = finish;
+          audio.onerror = finish;
+          setTimeout(finish, maxMs); // Notausstieg
+          audio.play().catch(finish);
         });
         opts.onEnd?.();
         return;
@@ -145,11 +151,17 @@ export async function speak(text: string, opts: SpeakOptions = {}): Promise<void
   u.rate = 0.98;
   u.pitch = 1.0;
   u.onstart = () => opts.onStart?.();
-  u.onend = () => opts.onEnd?.();
   u.onboundary = (e) => opts.onBoundary?.(e.charIndex);
-  speechSynthesis.cancel();
-  speechSynthesis.speak(u);
-  await new Promise<void>((r) => (u.onend = () => r()));
+  try { speechSynthesis.cancel(); } catch {}
+  try { speechSynthesis.speak(u); } catch {}
+  await new Promise<void>((resolve) => {
+    let done = false;
+    const finish = () => { if (done) return; done = true; resolve(); };
+    u.onend = finish;
+    u.onerror = finish as any;
+    setTimeout(finish, maxMs); // Notausstieg, falls onend nie feuert (haeufig in Safari/Chrome)
+  });
+  opts.onEnd?.();
 }
 
 export function cancelSpeech() {

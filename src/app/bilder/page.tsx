@@ -5,7 +5,7 @@ import { VocabSetup } from "@/components/VocabSetup";
 
 // Bildmodus (Picture-first-Heuristik): erst Bildanker zeigen, dann Bedeutung
 // aufloesen. Nutzt Emoji-Anker; erweiterbar auf echte Bild-Assets (imageEmoji-Feld).
-interface Card { id: string; lemma: string; meaningDe: string; imageEmoji?: string; examples: { es: string; de: string }[] }
+interface Card { id: string; lemma: string; meaningDe: string; imageEmoji?: string; category?: string }
 
 export default function Bilder() {
   const [cards, setCards] = useState<Card[]>([]);
@@ -16,8 +16,8 @@ export default function Bilder() {
 
   function load() {
     setLoaded(false);
-    fetch("/api/vocab?limit=20").then((r) => r.json())
-      .then((d) => setCards((d.cards || []).filter((c: Card) => c.imageEmoji)))
+    fetch("/api/vocab/images").then((r) => r.json())
+      .then((d) => setCards(d.cards || []))
       .catch(() => setCards([]))
       .finally(() => setLoaded(true));
   }
@@ -25,7 +25,12 @@ export default function Bilder() {
   useEffect(() => {
     if (!cards.length) return;
     const correct = cards[i];
-    const distract = cards.filter((_, x) => x !== i).sort(() => Math.random() - 0.5).slice(0, 3);
+    // Ablenker: anderes Wort, anderes Emoji — bevorzugt aus ANDEREN Kategorien,
+    // damit die Optionen sich klar unterscheiden.
+    const pool = cards.filter((c, x) => x !== i && c.imageEmoji !== correct.imageEmoji && c.lemma !== correct.lemma);
+    const diffCat = pool.filter((c) => c.category !== correct.category).sort(() => Math.random() - 0.5);
+    const rest = pool.filter((c) => c.category === correct.category).sort(() => Math.random() - 0.5);
+    const distract = [...diffCat, ...rest].slice(0, 3);
     setOptions([correct, ...distract].sort(() => Math.random() - 0.5));
     setPicked(null);
   }, [cards, i]);

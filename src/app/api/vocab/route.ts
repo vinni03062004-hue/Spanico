@@ -2,17 +2,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/apiUser";
-import { maxTierForBand } from "@/lib/vocabBands";
 
 export async function GET(req: NextRequest) {
   const u = await requireUser();
   if ("error" in u) return u.error;
   const limit = Number(new URL(req.url).searchParams.get("limit") || 12);
-
-  // Freischaltung nach Sprachklasse: nur Haeufigkeitsstufen bis zum Niveau
-  // werden neu eingefuehrt (skaliert bis muttersprachlich bei "Highly reliable").
-  const profile = await prisma.languageProfile.findUnique({ where: { userId: u.userId } });
-  const maxTier = maxTierForBand(profile?.overallBand || "Novice unstable");
 
   // Faellige Wiederholungen
   const due = await prisma.reviewSchedule.findMany({
@@ -22,12 +16,13 @@ export async function GET(req: NextRequest) {
     take: limit,
   });
 
-  // Neue Vokabeln (noch kein Review-Eintrag), nach Haeufigkeit
+  // Neue Vokabeln aus dem GESAMTEN Bestand (keine Niveau-Obergrenze mehr),
+  // nur nach Haeufigkeit sortiert -> haeufigste zuerst, dann immer seltenere.
   const seenIds = (
     await prisma.reviewSchedule.findMany({ where: { userId: u.userId }, select: { vocabId: true } })
   ).map((r) => r.vocabId);
   const fresh = await prisma.vocabularyEntry.findMany({
-    where: { id: { notIn: seenIds.length ? seenIds : ["_"] }, frequencyTier: { lte: maxTier } },
+    where: { id: { notIn: seenIds.length ? seenIds : ["_"] } },
     orderBy: [{ frequencyTier: "asc" }, { createdAt: "asc" }],
     take: Math.max(0, limit - due.length),
   });

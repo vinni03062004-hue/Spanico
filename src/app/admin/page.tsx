@@ -7,7 +7,17 @@ export default function Admin() {
   const [imp, setImp] = useState<{ running: boolean; processed: number; available: number; total: number } | null>(null);
   const [tts, setTts] = useState<any>(null);
   const [ttsBusy, setTtsBusy] = useState(false);
+  const [browse, setBrowse] = useState<any>(null);
+  const [cat, setCat] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
   useEffect(() => { fetch("/api/admin").then((r) => r.json()).then(setD); }, []);
+  async function loadBrowse(category?: string | null, q?: string) {
+    const params = new URLSearchParams();
+    if (category) params.set("category", category);
+    if (q) params.set("q", q);
+    const r = await fetch("/api/vocab/browse?" + params.toString()).then((x) => x.json());
+    setBrowse(r);
+  }
   async function testTts() {
     setTtsBusy(true); setTts(null);
     try { setTts(await fetch("/api/tts/test").then((r) => r.json())); }
@@ -45,6 +55,40 @@ export default function Admin() {
   return (
     <div className="space-y-4">
       <h1 className="h-title">Admin & Debug</h1>
+
+      <div className="card p-5">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div><p className="font-medium">Vokabeln in der Datenbank</p><p className="label">Zeigt, welche Wörter mit Übersetzung drin sind — nach Kategorien.</p></div>
+          <button className="btn btn-primary" onClick={() => loadBrowse(null)}>Übersicht laden</button>
+        </div>
+        {browse && (
+          <div className="mt-3 space-y-3">
+            <p className="text-sm">Gesamt: <b>{browse.total}</b> Wörter · {browse.categories.length} Kategorien</p>
+            <form onSubmit={(e) => { e.preventDefault(); setCat(null); loadBrowse(null, search); }} className="flex gap-2">
+              <input className="input" placeholder="Suche (spanisch oder deutsch)…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <button className="btn" type="submit">Suchen</button>
+            </form>
+            <div className="flex flex-wrap gap-1">
+              {browse.categories.map((c: any) => (
+                <button key={c.category} onClick={() => { setCat(c.category); setSearch(""); loadBrowse(c.category); }}
+                  className={`chip ${cat === c.category ? "border-primary text-primary" : ""}`}>{c.category} ({c.count})</button>
+              ))}
+            </div>
+            {browse.words?.length > 0 && (
+              <div className="max-h-80 overflow-y-auto border border-line rounded-xl divide-y divide-line">
+                {browse.words.map((w: any, i: number) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-1.5 text-sm">
+                    <span>{w.imageEmoji ? w.imageEmoji + " " : ""}<b>{w.lemma}</b> — {w.meaningDe}</span>
+                    <span className="text-muted text-xs">{w.pos} · {w.category} · Stufe {w.frequencyTier}</span>
+                  </div>
+                ))}
+                {browse.limited && <p className="text-xs text-muted px-3 py-1">… nur die ersten 500 angezeigt.</p>}
+              </div>
+            )}
+            {(cat || search) && browse.words?.length === 0 && <p className="label">Keine Treffer.</p>}
+          </div>
+        )}
+      </div>
       <div className="card p-5 flex items-center justify-between">
         <div><p className="font-medium">Datenbank befüllen (Grundwortschatz)</p><p className="label">Seed-Vokabeln & Szenarien (idempotent). Aktuell: {d?.vocabCount ?? "…"} Vokabeln.</p></div>
         <button className="btn btn-primary" onClick={seed}>Seed ausführen</button>
