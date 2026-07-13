@@ -11,14 +11,19 @@ export const maxDuration = 60;
 // Einmal ermitteltes, funktionierendes Bildmodell (pro Warm-Instanz gecacht).
 let RESOLVED_MODEL: string | null = null;
 
+// günstigste/gratis-freundlichste zuerst: lite -> flash -> Rest
+function rank(n: string): number { return n.includes("lite") ? 0 : n.includes("flash") ? 1 : 2; }
+
 async function listImageModels(key: string): Promise<string[]> {
   try {
     const lm = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}&pageSize=200`).then((r) => r.json());
     const names = (lm?.models || [])
       .filter((m: any) => (m.name || "").toLowerCase().includes("image") && (m.supportedGenerationMethods || []).includes("generateContent"))
-      .map((m: any) => (m.name || "").replace("models/", ""));
-    // günstige "flash"-Modelle bevorzugen, teure "pro" ans Ende
-    names.sort((a: string, b: string) => (a.includes("pro") ? 1 : 0) - (b.includes("pro") ? 1 : 0));
+      .map((m: any) => (m.name || "").replace("models/", ""))
+      // "pro"-Bildmodelle NIE nutzen (kein Gratis-Kontingent, kosten Geld).
+      .filter((n: string) => !n.includes("pro"));
+    // günstigste zuerst: lite -> flash -> Rest
+    names.sort((a: string, b: string) => rank(a) - rank(b));
     return names;
   } catch { return []; }
 }

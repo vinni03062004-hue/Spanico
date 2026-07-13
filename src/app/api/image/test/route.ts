@@ -8,8 +8,10 @@ async function listImageModels(key: string): Promise<string[]> {
     const lm = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}&pageSize=200`).then((r) => r.json());
     const names = (lm?.models || [])
       .filter((m: any) => (m.name || "").toLowerCase().includes("image") && (m.supportedGenerationMethods || []).includes("generateContent"))
-      .map((m: any) => (m.name || "").replace("models/", ""));
-    names.sort((a: string, b: string) => (a.includes("pro") ? 1 : 0) - (b.includes("pro") ? 1 : 0));
+      .map((m: any) => (m.name || "").replace("models/", ""))
+      .filter((n: string) => !n.includes("pro")); // "pro" nie (kein Gratis-Kontingent)
+    const rank = (n: string) => (n.includes("lite") ? 0 : n.includes("flash") ? 1 : 2);
+    names.sort((a: string, b: string) => rank(a) - rank(b));
     return names;
   } catch { return []; }
 }
