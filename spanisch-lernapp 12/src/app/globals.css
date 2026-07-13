@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+
+html, body {
+  background: radial-gradient(1200px 800px at 70% -10%, #0e1a2b 0%, #070b12 55%, #05070c 100%);
+  color: #e7edf5;
+  min-height: 100%;
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+
+/* Fokuszustaende fuer Accessibility */
+:focus-visible {
+  outline: 2px solid #38e1ff;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.card {
+  @apply bg-surface/70 border border-line rounded-2xl backdrop-blur-sm;
+}
+.btn {
+  @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium transition
+         border border-line bg-surface2 hover:border-primary/60 hover:shadow-glow active:scale-[0.98];
+}
+.btn-primary {
+  @apply text-base bg-gradient-to-r from-primary to-primary2 border-transparent text-black font-semibold
+         hover:shadow-glow;
+}
+.btn-ghost { @apply bg-transparent border-transparent hover:bg-surface2; }
+.input {
+  @apply w-full px-4 py-3 rounded-xl bg-surface2 border border-line text-base
+         placeholder:text-muted focus:border-primary/70 outline-none;
+}
+.chip { @apply text-xs px-2 py-1 rounded-full border border-line bg-surface2 text-muted; }
+.label { @apply text-sm text-muted; }
+.h-title { @apply text-2xl font-semibold tracking-tight; }
+
+/* Jarvis Reaktorkern */
+.reactor {
+  position: relative;
+  width: min(60vw, 320px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, rgba(56,225,255,0.9), rgba(0,120,200,0.25) 45%, transparent 70%);
+  box-shadow: 0 0 80px -10px rgba(56,225,255,0.6), inset 0 0 60px rgba(56,225,255,0.4);
+}
+.reactor.speaking { animation: pulseCore 1.4s ease-in-out infinite; }
+.reactor.listening { box-shadow: 0 0 80px -10px rgba(124,92,255,0.7), inset 0 0 60px rgba(124,92,255,0.5); }
+.reactor.error { box-shadow: 0 0 80px -10px rgba(255,92,124,0.7), inset 0 0 60px rgba(255,92,124,0.5); }
+.reactor-ring {
+  position: absolute; inset: -18px; border-radius: 50%;
+  border: 1px solid rgba(56,225,255,0.25);
+  animation: spinSlow 18s linear infinite;
+}
+.reactor-ring.two { inset: -34px; border-color: rgba(124,92,255,0.2); animation-duration: 28s; animation-direction: reverse; }
+
+.meter { @apply h-2 rounded-full bg-surface2 overflow-hidden; }
+.meter > span { @apply block h-full bg-gradient-to-r from-primary to-accent; }

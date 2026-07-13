@@ -1,0 +1,169 @@
+"use client";
+// Client-seitige Sprach-Utilities.
+// STT: Web Speech API (spanisch, kontinuierlich, Interim-Ergebnisse -> Live-Transkript).
+// TTS: bevorzugt serverseitige Premium-Stimme (/api/tts, gecacht); faellt sonst
+//      auf die BESTE verfuegbare Browser-Stimme zurueck (online-neural, nicht eSpeak).
+
+export interface SttHandlers {
+  onInterim?: (text: string) => void;
+  onFinal?: (text: string, confidence: number) => void;
+  onState?: (s: "listening" | "idle" | "error") => void;
+  onError?: (code: string) => void;
+}
+
+export class SpanishRecognizer {
+  private rec: any = null;
+  private active = false;
+  private muted = false; // waehrend die KI spricht, um Echo zu vermeiden
+  supported = false;
+
+  setMuted(m: boolean) { this.muted = m; }
+
+  constructor(private handlers: SttHandlers, private biasPhrases: string[] = []) {
+    if (typeof window === "undefined") return;
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) return;
+    this.supported = true;
+    this.rec = new SR();
+    this.rec.lang = "es-ES";           // Spanisch priorisiert
+    this.rec.continuous = true;         // Gespraech bricht nicht nach jedem Satz ab
+    this.rec.interimResults = true;     // Zwischenstaende fuer Live-Transkript
+    this.rec.maxAlternatives = 1;
+
+    this.rec.onresult = (e: any) => {
+      if (this.muted) return; // Ergebnisse ignorieren, solange die KI spricht (Echo-Schutz)
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) {
+          const conf = r[0].confidence ?? 0.6;
+          this.handlers.onFinal?.(r[0].transcript.trim(), conf);
+        } else {
+          interim += r[0].transcript;
+        }
+      }
+      if (interim) this.handlers.onInterim?.(interim.trim());
+    };
+    this.rec.onerror = (e: any) => {
+      const code = e?.error || "unknown";
+      // Harmlose Meldungen (keine Sprache erkannt / abgebrochen) NICHT als Fehler behandeln.
+      if (code === "no-speech" || code === "aborted") return;
+      this.handlers.onError?.(code);
+    };
+    this.rec.onend = () => {
+      // Auto-Neustart fuer quasi-kontinuierliche Konversation (kleine Pausen != Ende).
+      if (this.active) {
+        try { this.rec.start(); } catch {}
+      } else {
+        this.handlers.onState?.("idle");
+      }
+    };
+  }
+
+  start() {
+    if (!this.rec || this.active) return;
+    this.active = true;
+    try { this.rec.start(); this.handlers.onState?.("listening"); } catch {}
+  }
+  stop() {
+    this.active = false;
+    try { this.rec?.stop(); } catch {}
+  }
+  get isActive() { return this.active; }
+}
+
+// ---- TTS ----
+let cachedVoices: SpeechSynthesisVoice[] = [];
+function loadVoices(): Promise<SpeechSynthesisVoice[]> {
+  return new Promise((resolve) => {
+    const v = speechSynthesis.getVoices();
+    if (v.length) { cachedVoices = v; return resolve(v); }
+    speechSynthesis.onvoiceschanged = () => {
+      cachedVoices = speechSynthesis.getVoices();
+      resolve(cachedVoices);
+    };
+  });
+}
+
+// Waehlt die natuerlichste verfuegbare spanische Browser-Stimme
+// (bevorzugt Google/Microsoft-Online-Neural, meidet eSpeak/robotisch).
+function bestSpanishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
+  const es = voices.filter((v) => v.lang.toLowerCase().startsWith("es"));
+  const rank = (v: SpeechSynthesisVoice) => {
+    const n = v.name.toLowerCase();
+    if (n.includes("google")) return 3;                 // meist online-neural, natuerlich
+    if (n.includes("microsoft") && n.includes("online")) return 3;
+    if (n.includes("neural") || n.includes("premium") || n.includes("enhanced")) return 2;
+    if (n.includes("espeak")) return -1;                // robotisch -> meiden
+    return 1;
+  };
+  return es.sort((a, b) => rank(b) - rank(a))[0];
+}
+
+export interface SpeakOptions {
+  provider?: string;     // "browser" erzwingt Browser-TTS
+  voice?: string;        // Server-Voice-ID
+  onStart?: () => void;
+  onEnd?: () => void;
+  onBoundary?: (charIndex: number) => void;
+}
+
+// Spricht Text. Versucht zuerst Server-Premium-Audio (menschlich, gecacht),
+// faellt bei Fehlen/Fehler auf die beste Browser-Stimme zurueck.
+export async function speak(text: string, opts: SpeakOptions = {}): Promise<void> {
+  // Sicherheits-Zeitlimit: die Stimme darf NIE dauerhaft haengen bleiben,
+  // sonst blockiert der Sprachmodus. Grob nach Textlaenge geschaetzt.
+  const maxMs = Math.min(25000, Math.max(4000, text.length * 90 + 2500));
+  if (opts.provider !== "browser") {
+    try {
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text, voice: opts.voice }),
+      });
+      const ct = res.headers.get("content-type") || "";
+      if (res.ok && ct.startsWith("audio")) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        opts.onStart?.();
+        await new Promise<void>((resolve) => {
+          let done = false;
+          const finish = () => { if (done) return; done = true; try { URL.revokeObjectURL(url); } catch {} resolve(); };
+          audio.onended = finish;
+          audio.onerror = finish;
+          setTimeout(finish, maxMs); // Notausstieg
+          audio.play().catch(finish);
+        });
+        opts.onEnd?.();
+        return;
+      }
+    } catch {
+      // faellt unten auf Browser durch
+    }
+  }
+  // Browser-Fallback
+  const voices = cachedVoices.length ? cachedVoices : await loadVoices();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "es-ES";
+  const v = bestSpanishVoice(voices);
+  if (v) u.voice = v;
+  u.rate = 0.98;
+  u.pitch = 1.0;
+  u.onstart = () => opts.onStart?.();
+  u.onboundary = (e) => opts.onBoundary?.(e.charIndex);
+  try { speechSynthesis.cancel(); } catch {}
+  try { speechSynthesis.speak(u); } catch {}
+  await new Promise<void>((resolve) => {
+    let done = false;
+    const finish = () => { if (done) return; done = true; resolve(); };
+    u.onend = finish;
+    u.onerror = finish as any;
+    setTimeout(finish, maxMs); // Notausstieg, falls onend nie feuert (haeufig in Safari/Chrome)
+  });
+  opts.onEnd?.();
+}
+
+export function cancelSpeech() {
+  try { speechSynthesis.cancel(); } catch {}
+}
