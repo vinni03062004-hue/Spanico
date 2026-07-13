@@ -53,30 +53,35 @@ export async function GET(req: NextRequest) {
     if (row?.data) return new NextResponse(Buffer.from(row.data as any), { headers: { "content-type": row.contentType, "x-cache": "db", "cache-control": "public, max-age=31536000" } });
   } catch {}
 
-  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
-  if (!key) return new NextResponse(null, { status: 404 });
+  const promptDe = `Eine einfache, klare, farbige Illustration von: ${meaning || word} ("${word}" auf Spanisch). Kindgerechter, freundlicher Stil, ein einzelnes zentrales Motiv, schlichter heller Hintergrund, KEIN Text, keine Buchstaben.`;
 
-  const prompt = `Eine einfache, klare, farbige Illustration von: ${meaning || word} ("${word}" auf Spanisch). Kindgerechter, freundlicher Stil, ein einzelnes zentrales Motiv, schlichter heller Hintergrund, KEIN Text, keine Buchstaben.`;
+  let buf: Buffer | null = null;
+  let ct = "image/jpeg";
 
-  // Modell ermitteln: bereits gefundenes, sonst env, sonst automatisch entdecken.
-  const candidates = [RESOLVED_MODEL, process.env.GEMINI_IMAGE_MODEL].filter(Boolean) as string[];
-  if (candidates.length === 0) candidates.push(...(await listImageModels(key)));
-
-  let out: { data: string; ct: string } | null = null;
-  for (const model of candidates) {
-    out = await generate(model, key, prompt);
-    if (out) { RESOLVED_MODEL = model; break; }
+  // 1) Pollinations.ai — kostenlos, ohne Key. Standardquelle.
+  if ((process.env.IMAGE_PROVIDER || "pollinations") !== "gemini") {
+    try {
+      const p = `simple clear colorful flat illustration of ${meaning || word}, single centered subject, plain light background, no text`;
+      const seed = Math.abs([...word].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7));
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=512&height=512&nologo=true&seed=${seed}`;
+      const r = await fetch(url);
+      if (r.ok) { buf = Buffer.from(await r.arrayBuffer()); ct = r.headers.get("content-type") || "image/jpeg"; }
+    } catch { /* Fallback unten */ }
   }
-  // Falls env-Modell nicht klappte: verfügbare Modelle durchgehen.
-  if (!out && !RESOLVED_MODEL) {
-    for (const model of await listImageModels(key)) {
-      out = await generate(model, key, prompt);
-      if (out) { RESOLVED_MODEL = model; break; }
+
+  // 2) Fallback: Gemini (nur wenn Key mit Bild-Billing vorhanden)
+  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
+  if (!buf && key) {
+    const candidates = [RESOLVED_MODEL, process.env.GEMINI_IMAGE_MODEL].filter(Boolean) as string[];
+    if (candidates.length === 0) candidates.push(...(await listImageModels(key)));
+    for (const model of candidates) {
+      const out = await generate(model, key, promptDe);
+      if (out) { RESOLVED_MODEL = model; buf = Buffer.from(out.data, "base64"); ct = out.ct; break; }
     }
   }
-  if (!out) return new NextResponse(null, { status: 404 });
 
-  const buf = Buffer.from(out.data, "base64");
-  try { await prisma.imageCache.create({ data: { key: word, contentType: out.ct, data: buf } }); } catch {}
-  return new NextResponse(buf, { headers: { "content-type": out.ct, "x-cache": "miss", "cache-control": "public, max-age=31536000" } });
+  if (!buf || buf.length < 100) return new NextResponse(null, { status: 404 });
+
+  try { await prisma.imageCache.create({ data: { key: word, contentType: ct, data: buf } }); } catch {}
+  return new NextResponse(buf, { headers: { "content-type": ct, "x-cache": "miss", "cache-control": "public, max-age=31536000" } });
 }

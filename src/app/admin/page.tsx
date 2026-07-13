@@ -137,10 +137,14 @@ export default function Admin() {
         {img && (
           <div className={`mt-3 rounded-xl p-3 border text-sm ${img.ok ? "border-good/50 bg-good/10" : "border-bad/40 bg-bad/10"}`}>
             <p className="font-medium">{img.ok ? "✓ Bildgenerierung funktioniert" : "✗ Bildgenerierung nicht möglich"}</p>
-            {img.status ? <p className="text-muted">Status {img.status}</p> : null}
+            {img.keyVar && <p className="text-muted">Key: {img.keyVar} = {img.keyPreview}</p>}
+            {img.modelVar && <p className="text-muted">GEMINI_IMAGE_MODEL: {img.modelVar}</p>}
             {img.model && <p className="text-muted">Modell: {img.model}</p>}
             {img.message && <p className="text-muted">{img.message}</p>}
-            {img.verfuegbareBildmodelle?.length ? <p className="text-muted">Verfügbar: {img.verfuegbareBildmodelle.join(", ")}</p> : null}
+            {img.proModelle?.length ? (
+              <div className="text-muted text-xs mt-1">{img.proModelle.map((r: string, i: number) => <p key={i}>• {r}</p>)}</div>
+            ) : null}
+            {img.verfuegbareBildmodelle?.length ? <p className="text-muted text-xs mt-1">Verfügbar: {img.verfuegbareBildmodelle.join(", ")}</p> : null}
             {img.hinweis && <p className="text-warn mt-1">→ {img.hinweis}</p>}
           </div>
         )}
