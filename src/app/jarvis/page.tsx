@@ -17,6 +17,7 @@ export default function Jarvis() {
   const [supported, setSupported] = useState(true);
   const [running, setRunning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [dbg, setDbg] = useState({ interim: 0, sent: 0 }); // Diagnose
 
   const recRef = useRef<SpanishRecognizer | null>(null);
   const sessionRef = useRef<string | undefined>();
@@ -37,6 +38,7 @@ export default function Jarvis() {
       {
         onInterim: (t) => {
           setInterim(t);
+          setDbg((d) => ({ ...d, interim: d.interim + 1 }));
           // Fallback: markiert der Browser nie "final" (z.B. Safari), lösen wir
           // nach kurzer Sprechpause selbst aus.
           pendingRef.current = t;
@@ -105,10 +107,18 @@ export default function Jarvis() {
     // abgedeckt); NICHT an speakingRef koppeln, damit nichts hängen bleibt.
     if (processingRef.current) return;
     processingRef.current = true;
+    setDbg((d) => ({ ...d, sent: d.sent + 1 }));
     setTranscript((t) => [...t, { role: "user", text }]);
     setState("thinking");
     await coachTurn(text, conf);
     processingRef.current = false;
+  }
+  // Notweg: sendet manuell, was gerade erkannt wurde.
+  function sendNow() {
+    const txt = (pendingRef.current || interim).trim();
+    if (silenceTimer.current) clearTimeout(silenceTimer.current);
+    pendingRef.current = "";
+    if (txt) { setInterim(""); handleUser(txt, 0.6); }
   }
 
   async function coachTurn(userSaid: string, conf = 0.6) {
@@ -188,14 +198,20 @@ export default function Jarvis() {
         </div>
         {!supported && <p className="text-bad text-sm text-center mb-2">Dein Browser unterstützt die Spracherkennung nicht. Nutze Chrome/Edge (Desktop/Android) oder den Aussprache-Modus.</p>}
         {notice && <p className="text-warn text-sm text-center mb-2">{notice}</p>}
-        <p className="text-[10px] text-muted/60 text-center mb-1">Version: Stille-Erkennung aktiv (v3)</p>
-        <div className="flex gap-2 justify-center">
+        <p className="text-[10px] text-muted/60 text-center mb-1">
+          v4 · Erkennung: {supported ? "ja" : "nein"} · erkannt: {dbg.interim} · gesendet: {dbg.sent}
+        </p>
+        <div className="flex gap-2 justify-center flex-wrap">
           {!running ? (
             <button className="btn btn-primary px-8" onClick={start}>● Gespräch starten</button>
           ) : (
-            <button className="btn px-8" onClick={stop}>■ Beenden</button>
+            <>
+              <button className="btn btn-primary px-6" onClick={sendNow}>▶︎ Antwort holen</button>
+              <button className="btn px-6" onClick={stop}>■ Beenden</button>
+            </>
           )}
         </div>
+        {running && <p className="text-[11px] text-muted text-center mt-1">Sprich, mach kurz Pause — oder tippe „Antwort holen", falls nichts passiert.</p>}
       </div>
     </div>
   );

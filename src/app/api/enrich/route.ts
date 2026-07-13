@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/apiUser";
 import { ALL_ES } from "@/data/es_all";
+import { EMOJI_MAP } from "@/data/emojiMap";
 
 export const maxDuration = 60;
 // Viele Wörter pro Anfrage = wenige Anfragen (schont das Tageslimit RPD).
@@ -99,7 +100,9 @@ export async function POST(req: NextRequest) {
         .filter((x) => x.de)
         .map((x, i) => ({
           lemma: x.w, pos: "?", meaningDe: x.de, explanationEs: "", examples: [],
-          category: "import", frequencyTier: rankToTier(offset + i + 1), layer: "thematisch",
+          category: EMOJI_MAP[x.w] ? "bild" : "import",
+          frequencyTier: rankToTier(offset + i + 1), layer: "thematisch",
+          imageEmoji: EMOJI_MAP[x.w] || null,
           collocations: [], confusables: [], pronTargets: [],
         }));
       if (rows.length) {

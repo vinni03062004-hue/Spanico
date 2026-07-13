@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { VOCABULARY } from "@/data/vocabulary";
 import { SCENARIOS } from "@/data/scenarios";
+import { EMOJI_MAP } from "@/data/emojiMap";
 
 export async function POST() {
   let created = 0;
@@ -25,6 +26,17 @@ export async function POST() {
       create: { key: s.key, title: s.title, difficulty: s.difficulty, steps: s.steps as any, targetVocab: s.targetVocab as any },
     });
   }
+  // Backfill: allen DB-Wörtern (auch importierten/übersetzten) ohne Bildanker
+  // ein Emoji geben, wenn ihr Lemma in der Karte steht -> Bildmodus nutzt alle.
+  let images = 0;
+  for (const [lemma, emoji] of Object.entries(EMOJI_MAP)) {
+    const r = await prisma.vocabularyEntry.updateMany({
+      where: { lemma, imageEmoji: null },
+      data: { imageEmoji: emoji },
+    });
+    images += r.count;
+  }
+
   const total = await prisma.vocabularyEntry.count();
-  return NextResponse.json({ ok: true, neu: created, gesamt: total, szenarien: SCENARIOS.length });
+  return NextResponse.json({ ok: true, neu: created, gesamt: total, szenarien: SCENARIOS.length, bilderNachgetragen: images });
 }
