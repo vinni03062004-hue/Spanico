@@ -1,15 +1,18 @@
 // Liefert viele Vokabeln MIT Bildanker (imageEmoji) für den Bildmodus,
 // zufällig gemischt -> hohe Variabilität, klar unterscheidbare Optionen.
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/apiUser";
+import { CURRICULUM } from "@/data/curriculum";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const u = await requireUser();
   if ("error" in u) return u.error;
+  const chapter = new URL(req.url).searchParams.get("chapter");
+  const catFilter = chapter !== null ? CURRICULUM[Number(chapter)]?.categories : null;
 
   const all = await prisma.vocabularyEntry.findMany({
-    where: { imageEmoji: { not: null } },
+    where: { imageEmoji: { not: null }, ...(catFilter ? { category: { in: catFilter } } : {}) },
     select: { id: true, lemma: true, meaningDe: true, imageEmoji: true, category: true },
     take: 300,
   });

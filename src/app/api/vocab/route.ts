@@ -2,11 +2,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/apiUser";
+import { CURRICULUM } from "@/data/curriculum";
 
 export async function GET(req: NextRequest) {
   const u = await requireUser();
   if ("error" in u) return u.error;
-  const limit = Number(new URL(req.url).searchParams.get("limit") || 12);
+  const sp = new URL(req.url).searchParams;
+  const limit = Number(sp.get("limit") || 12);
+  // Optionaler Kapitel-Filter (Roadmap): nur Wörter der Kapitel-Kategorien.
+  const chapter = sp.get("chapter");
+  const catFilter = chapter !== null ? CURRICULUM[Number(chapter)]?.categories : null;
 
   // Faellige Wiederholungen
   const due = await prisma.reviewSchedule.findMany({
@@ -22,7 +27,10 @@ export async function GET(req: NextRequest) {
     await prisma.reviewSchedule.findMany({ where: { userId: u.userId }, select: { vocabId: true } })
   ).map((r) => r.vocabId);
   const fresh = await prisma.vocabularyEntry.findMany({
-    where: { id: { notIn: seenIds.length ? seenIds : ["_"] } },
+    where: {
+      id: { notIn: seenIds.length ? seenIds : ["_"] },
+      ...(catFilter ? { category: { in: catFilter } } : {}),
+    },
     orderBy: [{ frequencyTier: "asc" }, { createdAt: "asc" }],
     take: Math.max(0, limit - due.length),
   });

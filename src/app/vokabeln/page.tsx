@@ -25,7 +25,8 @@ export default function Vokabeln() {
   async function load() {
     setLoaded(false);
     try {
-      const r = await fetch("/api/vocab?limit=12").then((x) => x.json());
+      const ch = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chapter") : null;
+      const r = await fetch(`/api/vocab?limit=12${ch !== null ? `&chapter=${ch}` : ""}`).then((x) => x.json());
       setCards(r.cards || []);
     } catch { setCards([]); }
     setI(0); setDone(false); reset(); setLoaded(true);

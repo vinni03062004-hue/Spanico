@@ -15,9 +15,12 @@ export default function Aussprache() {
   const [result, setResult] = useState<null | { similarity: number; band: string; uncertain: boolean; analysis: any }>(null);
   const confRef = useRef(0.6);
 
-  // Roadmap-Metadaten laden
+  // Roadmap-Metadaten laden; optional direkt ein Kapitel aus der URL öffnen.
   useEffect(() => {
     fetch("/api/vocab/practice").then((r) => r.json()).then((d) => setChapters(d.chapters || [])).catch(() => {});
+    const ch = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chapter") : null;
+    if (ch !== null) openChapter(Number(ch));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const item = items[idx];

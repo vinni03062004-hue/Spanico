@@ -16,7 +16,8 @@ export default function Bilder() {
 
   function load() {
     setLoaded(false);
-    fetch("/api/vocab/images").then((r) => r.json())
+    const ch = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("chapter") : null;
+    fetch(`/api/vocab/images${ch !== null ? `?chapter=${ch}` : ""}`).then((r) => r.json())
       .then((d) => setCards(d.cards || []))
       .catch(() => setCards([]))
       .finally(() => setLoaded(true));
