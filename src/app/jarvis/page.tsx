@@ -26,6 +26,13 @@ export default function Jarvis() {
   const pendingRef = useRef("");            // letztes Zwischen-Transkript
   const silenceTimer = useRef<any>(null);   // löst nach kurzer Stille aus
   const processingRef = useRef(false);      // verhindert Doppel-Verarbeitung
+  const runningRef = useRef(false);         // immer aktueller Status (gegen veraltete Closures)
+  const scenarioRef = useRef<string | undefined>(undefined);
+  useEffect(() => { scenarioRef.current = scenarioKey; }, [scenarioKey]);
+  // "Lebende" Referenz auf handleUser -> die Erkenner-Handler rufen IMMER die
+  // aktuelle Version auf (sonst greift eine veraltete Closure).
+  const handleUserRef = useRef<(t: string, c: number) => void>(() => {});
+  useEffect(() => { handleUserRef.current = handleUser; });
 
   useEffect(() => {
     fetch("/api/scenarios").then((r) => r.json()).then((d) => setScenarios(d.scenarios || [])).catch(() => {});
@@ -46,14 +53,14 @@ export default function Jarvis() {
           silenceTimer.current = setTimeout(() => {
             const txt = pendingRef.current.trim();
             pendingRef.current = "";
-            if (txt) { setInterim(""); handleUser(txt, 0.6); }
+            if (txt) { setInterim(""); handleUserRef.current(txt, 0.6); }
           }, 1800);
         },
         onFinal: (t, conf) => {
           if (silenceTimer.current) clearTimeout(silenceTimer.current);
           pendingRef.current = "";
           setInterim("");
-          handleUser(t, conf);
+          handleUserRef.current(t, conf);
         },
         onState: (s) => { if (s === "error") setState("error"); },
         onError: (code) => {
@@ -77,6 +84,7 @@ export default function Jarvis() {
   async function start() {
     const rec = ensureRecognizer();
     if (!rec.supported) { setSupported(false); return; }
+    runningRef.current = true;
     setRunning(true);
     setState("listening");
     setNotice(null);
@@ -95,6 +103,7 @@ export default function Jarvis() {
     setState("listening");
   }
   function stop() {
+    runningRef.current = false;
     setRunning(false);
     recRef.current?.stop();
     cancelSpeech();
@@ -102,7 +111,7 @@ export default function Jarvis() {
   }
 
   async function handleUser(text: string, conf: number) {
-    if (!running) return;
+    if (!runningRef.current) return;
     // Sperre nur gegen Doppel-Verarbeitung (Echo ist über die Stummschaltung
     // abgedeckt); NICHT an speakingRef koppeln, damit nichts hängen bleibt.
     if (processingRef.current) return;
@@ -125,7 +134,7 @@ export default function Jarvis() {
     try {
       const res = await fetch("/api/conversation", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionId: sessionRef.current, scenarioKey, stepIndex: stepRef.current, userSaid }),
+        body: JSON.stringify({ sessionId: sessionRef.current, scenarioKey: scenarioRef.current, stepIndex: stepRef.current, userSaid }),
       }).then((r) => r.json());
       sessionRef.current = res.sessionId;
       stepRef.current = res.nextStepIndex ?? stepRef.current;
@@ -151,11 +160,11 @@ export default function Jarvis() {
       await speak(res.reply, { onEnd: () => { speakingRef.current = false; } });
       recRef.current?.setMuted(false);
       setInterim("");
-      if (running) setState("listening");
+      if (runningRef.current) setState("listening");
     } catch {
       setState("error");
       setTranscript((t) => [...t, { role: "coach", text: "(Keine Antwort vom Server — Datenbank verbunden? Für echte freie Gespräche einen KI-Key setzen.)" }]);
-      if (running) setState("listening");
+      if (runningRef.current) setState("listening");
     }
   }
 
@@ -199,7 +208,7 @@ export default function Jarvis() {
         {!supported && <p className="text-bad text-sm text-center mb-2">Dein Browser unterstützt die Spracherkennung nicht. Nutze Chrome/Edge (Desktop/Android) oder den Aussprache-Modus.</p>}
         {notice && <p className="text-warn text-sm text-center mb-2">{notice}</p>}
         <p className="text-[10px] text-muted/60 text-center mb-1">
-          v4 · Erkennung: {supported ? "ja" : "nein"} · erkannt: {dbg.interim} · gesendet: {dbg.sent}
+          v6 (Auto-Fix2) · Erkennung: {supported ? "ja" : "nein"} · erkannt: {dbg.interim} · gesendet: {dbg.sent}
         </p>
         <div className="flex gap-2 justify-center flex-wrap">
           {!running ? (

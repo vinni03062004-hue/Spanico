@@ -58,7 +58,7 @@ export default function Bilder() {
     <div className="max-w-xl mx-auto space-y-4">
       <div className="flex justify-between items-center"><h1 className="h-title">Bilder</h1><span className="chip">Bild → Wort</span></div>
       <div className="card p-8 text-center">
-        <div className="text-8xl mb-6">{card.imageEmoji}</div>
+        <WordImage word={card.lemma} meaning={card.meaningDe} emoji={card.imageEmoji} />
         <p className="label mb-3">Welches spanische Wort passt?</p>
         <div className="grid grid-cols-2 gap-2">
           {options.map((o) => {
@@ -79,6 +79,30 @@ export default function Bilder() {
           </div>
         )}
       </div>
+      <p className="text-[10px] text-muted/60 text-center">Erstes Anzeigen erzeugt bei Bedarf ein KI-Bild (einmalig), danach aus dem Cache.</p>
+    </div>
+  );
+}
+
+// Zeigt ein KI-Bild zum Wort. Beim ersten Mal wird es serverseitig erzeugt
+// (kurze Ladezeit), danach aus dem Cache. Faellt bei Fehler aufs Emoji zurueck.
+function WordImage({ word, meaning, emoji }: { word: string; meaning: string; emoji?: string }) {
+  const [status, setStatus] = useState<"loading" | "ok" | "fail">("loading");
+  const src = `/api/image?word=${encodeURIComponent(word)}&meaning=${encodeURIComponent(meaning)}`;
+  useEffect(() => { setStatus("loading"); }, [word]);
+  return (
+    <div className="mb-6 flex items-center justify-center h-48">
+      {status !== "fail" && (
+        <img
+          src={src}
+          alt=""
+          className={`max-h-48 rounded-xl object-contain ${status === "ok" ? "" : "hidden"}`}
+          onLoad={() => setStatus("ok")}
+          onError={() => setStatus("fail")}
+        />
+      )}
+      {status === "loading" && <span className="text-muted text-sm animate-pulse">Bild wird erzeugt…</span>}
+      {status === "fail" && <span className="text-8xl">{emoji || "🖼️"}</span>}
     </div>
   );
 }

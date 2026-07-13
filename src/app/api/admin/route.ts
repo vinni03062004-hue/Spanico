@@ -18,7 +18,13 @@ export async function GET() {
     by: ["mode"], where: { userId: u.userId, correct: false }, _count: { _all: true },
   });
 
+  // Cache-Status (Beweis, dass gespeichert wird -> danach 0 Verbrauch)
+  let audioCache = 0, imageCache = 0;
+  try { audioCache = await prisma.audioCache.count(); } catch {}
+  try { imageCache = await prisma.imageCache.count(); } catch {}
+
   return NextResponse.json({
+    audioCache, imageCache,
     vocabCount,
     traces: traces.map((t) => ({ kind: t.kind, provider: t.provider, latencyMs: t.latencyMs, ok: t.ok, at: t.createdAt })),
     speech: speech.map((s) => ({ mode: s.mode, band: s.band, conf: s.sttConfidence, uncertain: s.uncertain, target: s.targetText, heard: s.recognizedText })),

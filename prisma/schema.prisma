@@ -252,6 +252,25 @@ model Assessment {
   createdAt  DateTime @default(now())
 }
 
+// Dauerhafter Audio-Cache: jede Sprachausgabe wird nur EINMAL bei Google erzeugt
+// (verbraucht einmal Zeichen) und danach aus der DB abgespielt (0 Zeichen).
+model AudioCache {
+  key         String   @id  // Hash aus provider+voice+text
+  contentType String   @default("audio/mpeg")
+  data        Bytes
+  chars       Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+// Dauerhafter Bild-Cache: KI-Bild pro Vokabel wird nur EINMAL erzeugt und
+// danach aus der DB geladen (keine weitere Anfrage/Kosten).
+model ImageCache {
+  key         String   @id  // Lemma (klein)
+  contentType String   @default("image/png")
+  data        Bytes
+  createdAt   DateTime @default(now())
+}
+
 // Nachvollziehbarkeit serverseitiger KI-/Speech-Aufrufe (Auditierbarkeit).
 model ModelTrace {
   id         String   @id @default(cuid())

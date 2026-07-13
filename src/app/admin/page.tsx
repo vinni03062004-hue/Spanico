@@ -56,6 +56,11 @@ export default function Admin() {
     <div className="space-y-4">
       <h1 className="h-title">Admin & Debug</h1>
 
+      <div className="grid grid-cols-2 gap-3">
+        <div className="card p-4"><p className="label">Gespeicherte Stimmen (Cache)</p><p className="text-2xl font-semibold">{d?.audioCache ?? "…"}</p><p className="text-xs text-muted">so viele Sätze kosten künftig 0 Zeichen</p></div>
+        <div className="card p-4"><p className="label">Gespeicherte KI-Bilder (Cache)</p><p className="text-2xl font-semibold">{d?.imageCache ?? "…"}</p><p className="text-xs text-muted">einmal erzeugt, danach gratis</p></div>
+      </div>
+
       <div className="card p-5">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div><p className="font-medium">Vokabeln in der Datenbank</p><p className="label">Zeigt, welche Wörter mit Übersetzung drin sind — nach Kategorien.</p></div>
