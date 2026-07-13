@@ -22,6 +22,9 @@ export default function Jarvis() {
   const sessionRef = useRef<string | undefined>();
   const stepRef = useRef(0);
   const speakingRef = useRef(false);
+  const pendingRef = useRef("");            // letztes Zwischen-Transkript
+  const silenceTimer = useRef<any>(null);   // löst nach kurzer Stille aus
+  const processingRef = useRef(false);      // verhindert Doppel-Verarbeitung
 
   useEffect(() => {
     fetch("/api/scenarios").then((r) => r.json()).then((d) => setScenarios(d.scenarios || [])).catch(() => {});
@@ -34,8 +37,22 @@ export default function Jarvis() {
       {
         onInterim: (t) => {
           setInterim(t);
+          // Fallback: markiert der Browser nie "final" (z.B. Safari), lösen wir
+          // nach kurzer Sprechpause selbst aus.
+          pendingRef.current = t;
+          if (silenceTimer.current) clearTimeout(silenceTimer.current);
+          silenceTimer.current = setTimeout(() => {
+            const txt = pendingRef.current.trim();
+            pendingRef.current = "";
+            if (txt) { setInterim(""); handleUser(txt, 0.6); }
+          }, 1800);
         },
-        onFinal: (t, conf) => { setInterim(""); handleUser(t, conf); },
+        onFinal: (t, conf) => {
+          if (silenceTimer.current) clearTimeout(silenceTimer.current);
+          pendingRef.current = "";
+          setInterim("");
+          handleUser(t, conf);
+        },
         onState: (s) => { if (s === "error") setState("error"); },
         onError: (code) => {
           // Nur echte Probleme melden; kurz, dann weiter zuhören.
@@ -60,9 +77,20 @@ export default function Jarvis() {
     if (!rec.supported) { setSupported(false); return; }
     setRunning(true);
     setState("listening");
+    setNotice(null);
     rec.start();
-    // Eroeffnung durch den Coach
-    await coachTurn("");
+    // Begrüßung LOKAL (kein KI-Aufruf -> spart eine Anfrage pro Gespräch).
+    const sc = scenarios.find((s) => s.key === scenarioKey);
+    const greeting = sc?.steps?.[0]?.coachLine || "¡Hola! ¿De qué quieres hablar hoy?";
+    if (sc?.steps?.[0]) { setTask(sc.steps[0].prompt_de); setHint(sc.steps[0].hint || null); }
+    setTranscript((t) => [...t, { role: "coach", text: greeting }]);
+    speakingRef.current = true;
+    setState("speaking");
+    recRef.current?.setMuted(true);
+    await speak(greeting, { onEnd: () => { speakingRef.current = false; } });
+    recRef.current?.setMuted(false);
+    setInterim("");
+    setState("listening");
   }
   function stop() {
     setRunning(false);
@@ -73,10 +101,13 @@ export default function Jarvis() {
 
   async function handleUser(text: string, conf: number) {
     if (!running) return;
+    // Sperre gegen Doppel-Verarbeitung (Stille-Timer + evtl. spätes "final").
+    if (speakingRef.current || processingRef.current) return;
+    processingRef.current = true;
     setTranscript((t) => [...t, { role: "user", text }]);
     setState("thinking");
-    // Aussprache im Hintergrund bewerten (nur wenn Zielphrase existiert)
     await coachTurn(text, conf);
+    processingRef.current = false;
   }
 
   async function coachTurn(userSaid: string, conf = 0.6) {

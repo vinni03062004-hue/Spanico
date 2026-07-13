@@ -8,7 +8,10 @@ import { requireUser } from "@/lib/apiUser";
 import { ALL_ES } from "@/data/es_all";
 
 export const maxDuration = 60;
-const BATCH = 40;
+// Viele Wörter pro Anfrage = wenige Anfragen (schont das Tageslimit RPD).
+// 400 Wörter/Anfrage -> ~25 Anfragen für alle 10.000. Begrenzt durch die
+// max. Ausgabelänge (~8k Token), nicht durch die 250k Token/Minute.
+const BATCH = 400;
 
 function rankToTier(rank: number): number {
   if (rank <= 150) return 1;
@@ -40,6 +43,7 @@ async function translateBatch(words: string[]): Promise<Record<string, string>> 
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: SYS_TRANS + "\n\nWörter: " + JSON.stringify(words) }] }],
+        generationConfig: { maxOutputTokens: 8192, temperature: 0.2 },
       }),
     });
     if (!res.ok) {
@@ -54,7 +58,7 @@ async function translateBatch(words: string[]): Promise<Record<string, string>> 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": anthropic, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5", max_tokens: 1500, system: SYS_TRANS, messages: [{ role: "user", content: JSON.stringify(words) }] }),
+      body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5", max_tokens: 8000, system: SYS_TRANS, messages: [{ role: "user", content: JSON.stringify(words) }] }),
     });
     if (!res.ok) throw new Error("anthropic " + res.status);
     const data = await res.json();

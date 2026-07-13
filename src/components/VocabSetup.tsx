@@ -18,20 +18,26 @@ export function VocabSetup({ onDone }: { onDone?: () => void }) {
     setBusy(false);
   }
 
-  async function loop(url: string, label: string) {
+  async function loop(url: string, label: string, delayMs = 0) {
     setBusy(true); setMsg(label); setProg(null);
     let offset: number | null = 0;
     try {
       while (offset !== null) {
         const r: any = await fetch(`${url}?offset=${offset}`, { method: "POST" }).then((x) => x.json());
-        if (r.error) { setMsg("Fehler: " + r.error); break; }
+        if (r.error) {
+          // Bei Ratenlimit (429) kurz warten und automatisch weiterversuchen.
+          if (/429|rate|quota/i.test(r.error)) { setMsg("Kurze Pause wegen Minuten-Limit … läuft gleich weiter."); await sleep(20000); continue; }
+          setMsg("Fehler: " + r.error); break;
+        }
         setProg({ processed: r.processed, available: r.available });
         offset = r.nextOffset;
         if (r.done) { setMsg(`✓ Fertig — ${r.total} Wörter in der Datenbank.`); onDone?.(); }
+        else if (delayMs) await sleep(delayMs);
       }
     } catch { setMsg("Vorgang unterbrochen — bitte erneut versuchen."); }
     setBusy(false);
   }
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   async function testTts() {
     setTts(null); setBusy(true);
@@ -48,7 +54,7 @@ export function VocabSetup({ onDone }: { onDone?: () => void }) {
       </div>
       <div className="flex flex-wrap gap-2">
         <button className="btn btn-primary" onClick={seed} disabled={busy}>Grundwortschatz laden (~960)</button>
-        <button className="btn" onClick={() => loop("/api/enrich", "Übersetze alle 10.000 Wörter per KI … das dauert einige Minuten.")} disabled={busy}>Alle 10.000 übersetzen (KI)</button>
+        <button className="btn" onClick={() => loop("/api/enrich", "Übersetze alle 10.000 Wörter per KI (große Blöcke, nur ~25 Anfragen) … ein paar Minuten. Fenster offen lassen.", 4000)} disabled={busy}>Alle 10.000 übersetzen (KI)</button>
         <button className="btn" onClick={() => loop("/api/import-dict", "Importiere ~21.000 FreeDict-Wörter …")} disabled={busy}>21.000 importieren (FreeDict)</button>
         <button className="btn btn-ghost" onClick={testTts} disabled={busy}>🔊 Stimme testen</button>
       </div>
