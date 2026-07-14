@@ -53,33 +53,43 @@ export async function GET(req: NextRequest) {
     if (row?.data) return new NextResponse(Buffer.from(row.data as any), { headers: { "content-type": row.contentType, "x-cache": "db", "cache-control": "public, max-age=31536000" } });
   } catch {}
 
-  const promptDe = `Eine einfache, klare, farbige Illustration von: ${meaning || word} ("${word}" auf Spanisch). Kindgerechter, freundlicher Stil, ein einzelnes zentrales Motiv, schlichter heller Hintergrund, KEIN Text, keine Buchstaben.`;
+  const promptEn = `A clear, high-quality, colorful illustration of "${meaning}" (Spanish: ${word}). One single, clearly recognizable ${meaning} — the correct real object — centered and isolated on a plain white background. Clean, sharp, unambiguous. No text, no letters, no watermark.`;
+  const promptDe = `Eine klare, hochwertige, farbige Illustration von: ${meaning || word} ("${word}" auf Spanisch). Ein einzelnes zentrales Motiv, schlichter heller Hintergrund, KEIN Text.`;
 
   let buf: Buffer | null = null;
   let ct = "image/jpeg";
 
-  // 1) Pollinations.ai — kostenlos, ohne Key. Standardquelle.
-  if ((process.env.IMAGE_PROVIDER || "pollinations") !== "gemini") {
+  // 1) Cloudflare Workers AI (FLUX.1) — hochwertig, zuverlässig, ~230/Tag gratis.
+  const cfAcc = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const cfTok = process.env.CLOUDFLARE_API_TOKEN;
+  if (cfAcc && cfTok) {
     try {
-      // Präziser Prompt: deutsche Bedeutung als eindeutiges Motiv, spanisches
-      // Wort als Kontext. "enhance=true" übersetzt/erweitert intern ins Englische
-      // (wichtig für Treffer beim schnellen "turbo"-Modell).
-      const p = `The concept "${meaning}" (in Spanish: ${word}). Show ONE single, clearly recognizable ${meaning}, the correct real object/thing, centered and isolated, simple bright colorful illustration, plain white background, sharp and unambiguous, absolutely no text, no letters, no watermark.`;
-      const seed = Math.abs([...word].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7));
-      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=512&height=512&nologo=true&enhance=true&model=turbo&seed=${seed}`;
-      // Zeitlimit: hängt Pollinations (Rate-Limit), brechen wir ab -> Emoji-Fallback.
-      const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), 18000);
-      const r = await fetch(url, { signal: ctrl.signal });
-      clearTimeout(to);
-      if (r.ok) {
-        const ab = await r.arrayBuffer();
-        if (ab.byteLength > 500) { buf = Buffer.from(ab); ct = r.headers.get("content-type") || "image/jpeg"; }
-      }
-    } catch { /* Timeout/Fehler -> Fallback unten / Emoji */ }
+      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cfAcc}/ai/run/@cf/black-forest-labs/flux-1-schnell`, {
+        method: "POST", headers: { authorization: `Bearer ${cfTok}`, "content-type": "application/json" },
+        body: JSON.stringify({ prompt: promptEn, steps: 8 }),
+      });
+      if (res.ok) {
+        const j = await res.json();
+        const b64 = j?.result?.image;
+        if (b64) { buf = Buffer.from(b64, "base64"); ct = "image/jpeg"; }
+      } else { console.error("[image] cloudflare", res.status, (await res.text().catch(() => "")).slice(0, 160)); }
+    } catch (e: any) { console.error("[image] cloudflare", e?.message || e); }
   }
 
-  // 2) Fallback: Gemini (nur wenn Key mit Bild-Billing vorhanden)
+  // 2) Pollinations.ai (flux) — kostenlos, ohne Key. Fallback.
+  if (!buf && (process.env.IMAGE_PROVIDER || "pollinations") !== "gemini") {
+    try {
+      const seed = Math.abs([...word].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7));
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(promptEn)}?width=512&height=512&nologo=true&enhance=true&model=flux&seed=${seed}`;
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 20000);
+      const r = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(to);
+      if (r.ok) { const ab = await r.arrayBuffer(); if (ab.byteLength > 500) { buf = Buffer.from(ab); ct = r.headers.get("content-type") || "image/jpeg"; } }
+    } catch {}
+  }
+
+  // 3) Gemini (nur mit Bild-Billing)
   const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
   if (!buf && key) {
     const candidates = [RESOLVED_MODEL, process.env.GEMINI_IMAGE_MODEL].filter(Boolean) as string[];
