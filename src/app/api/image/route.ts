@@ -61,12 +61,22 @@ export async function GET(req: NextRequest) {
   // 1) Pollinations.ai — kostenlos, ohne Key. Standardquelle.
   if ((process.env.IMAGE_PROVIDER || "pollinations") !== "gemini") {
     try {
-      const p = `simple clear colorful flat illustration of ${meaning || word}, single centered subject, plain light background, no text`;
+      // Präziser Prompt: deutsche Bedeutung als eindeutiges Motiv, spanisches
+      // Wort als Kontext. "enhance=true" übersetzt/erweitert intern ins Englische
+      // (wichtig für Treffer beim schnellen "turbo"-Modell).
+      const p = `The concept "${meaning}" (in Spanish: ${word}). Show ONE single, clearly recognizable ${meaning}, the correct real object/thing, centered and isolated, simple bright colorful illustration, plain white background, sharp and unambiguous, absolutely no text, no letters, no watermark.`;
       const seed = Math.abs([...word].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7));
-      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=512&height=512&nologo=true&seed=${seed}`;
-      const r = await fetch(url);
-      if (r.ok) { buf = Buffer.from(await r.arrayBuffer()); ct = r.headers.get("content-type") || "image/jpeg"; }
-    } catch { /* Fallback unten */ }
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=512&height=512&nologo=true&enhance=true&model=turbo&seed=${seed}`;
+      // Zeitlimit: hängt Pollinations (Rate-Limit), brechen wir ab -> Emoji-Fallback.
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 18000);
+      const r = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(to);
+      if (r.ok) {
+        const ab = await r.arrayBuffer();
+        if (ab.byteLength > 500) { buf = Buffer.from(ab); ct = r.headers.get("content-type") || "image/jpeg"; }
+      }
+    } catch { /* Timeout/Fehler -> Fallback unten / Emoji */ }
   }
 
   // 2) Fallback: Gemini (nur wenn Key mit Bild-Billing vorhanden)

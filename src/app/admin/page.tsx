@@ -32,6 +32,13 @@ export default function Admin() {
     catch { setImg({ ok: false, message: "Anfrage fehlgeschlagen" }); }
     setImgBusy(false);
   }
+  async function clearImages() {
+    if (!confirm("Alle gespeicherten KI-Bilder löschen? Sie werden beim nächsten Anzeigen neu (verbessert) erzeugt.")) return;
+    setImgBusy(true);
+    try { const r = await fetch("/api/image/clear", { method: "POST" }).then((x) => x.json()); setImg({ ok: true, message: `${r.geloescht} Bilder gelöscht — werden neu erzeugt.` }); }
+    catch { setImg({ ok: false, message: "Fehler beim Leeren" }); }
+    setImgBusy(false);
+  }
   async function seed() {
     let offset: number | null = 0;
     try {
@@ -131,8 +138,11 @@ export default function Admin() {
 
       <div className="card p-5">
         <div className="flex items-center justify-between">
-          <div><p className="font-medium">KI-Bildgenerierung testen</p><p className="label">Prüft, ob echte Bilder erzeugt werden können — sonst mit genauem Grund.</p></div>
-          <button className="btn btn-primary" onClick={testImage} disabled={imgBusy}>{imgBusy ? "…" : "Bild testen"}</button>
+          <div><p className="font-medium">KI-Bildgenerierung</p><p className="label">Testen, ob Bilder erzeugt werden — oder falsche Bilder neu erzeugen lassen.</p></div>
+          <div className="flex gap-2">
+            <button className="btn" onClick={clearImages} disabled={imgBusy}>Cache leeren</button>
+            <button className="btn btn-primary" onClick={testImage} disabled={imgBusy}>{imgBusy ? "…" : "Bild testen"}</button>
+          </div>
         </div>
         {img && (
           <div className={`mt-3 rounded-xl p-3 border text-sm ${img.ok ? "border-good/50 bg-good/10" : "border-bad/40 bg-bad/10"}`}>

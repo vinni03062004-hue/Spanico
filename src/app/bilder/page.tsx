@@ -37,6 +37,14 @@ export default function Bilder() {
   }, [cards, i]);
 
   const card = cards[i];
+
+  // Vorab-Erzeugung: die nächsten 2 Bilder im Hintergrund laden -> sofort da,
+  // wenn man weiterklickt (kein Warten mehr).
+  useEffect(() => {
+    const n = cards[i + 1];
+    if (n?.lemma) { const im = new Image(); im.src = `/api/image?word=${encodeURIComponent(n.lemma)}&meaning=${encodeURIComponent(n.meaningDe)}`; }
+  }, [i, cards]);
+
   function pick(c: Card) {
     setPicked(c.id);
     const correct = c.id === card.id;
@@ -85,25 +93,45 @@ export default function Bilder() {
   );
 }
 
-// Zeigt ein KI-Bild zum Wort. Beim ersten Mal wird es serverseitig erzeugt
-// (kurze Ladezeit), danach aus dem Cache. Faellt bei Fehler aufs Emoji zurueck.
-function WordImage({ word, meaning, emoji }: { word: string; meaning: string; emoji?: string }) {
-  const [status, setStatus] = useState<"loading" | "ok" | "fail">("loading");
-  const src = `/api/image?word=${encodeURIComponent(word)}&meaning=${encodeURIComponent(meaning)}`;
-  useEffect(() => { setStatus("loading"); }, [word]);
+// Zeigt ein KI-Bild zum Wort. Beim ersten Mal wird es serverseitig erzeugt,
+// danach aus dem Cache. Bei Drosselung wird AUTOMATISCH wiederholt (kein Emoji).
+function WordImage({ word, meaning }: { word: string; meaning: string; emoji?: string }) {
+  const [status, setStatus] = useState<"loading" | "ok" | "retry">("loading");
+  const [attempt, setAttempt] = useState(0);
+  const src = `/api/image?word=${encodeURIComponent(word)}&meaning=${encodeURIComponent(meaning)}&r=${attempt}`;
+  useEffect(() => { setStatus("loading"); setAttempt(0); }, [word]);
+
+  function onError() {
+    // Auto-Wiederholung mit kurzer Pause (Pollinations-Drosselung abwarten).
+    if (attempt < 8) {
+      setStatus("loading");
+      setTimeout(() => setAttempt((a) => a + 1), 3500);
+    } else {
+      setStatus("retry");
+    }
+  }
+
   return (
-    <div className="mb-6 flex items-center justify-center h-48">
-      {status !== "fail" && (
-        <img
-          src={src}
-          alt=""
-          className={`max-h-48 rounded-xl object-contain ${status === "ok" ? "" : "hidden"}`}
-          onLoad={() => setStatus("ok")}
-          onError={() => setStatus("fail")}
-        />
+    <div className="mb-6 flex flex-col items-center justify-center min-h-48">
+      <img
+        src={src}
+        alt=""
+        className={`max-h-48 rounded-xl object-contain ${status === "ok" ? "" : "hidden"}`}
+        onLoad={() => setStatus("ok")}
+        onError={onError}
+      />
+      {status === "loading" && (
+        <div className="text-center">
+          <div className="w-10 h-10 mx-auto rounded-full border-2 border-primary/40 border-t-primary animate-spin" />
+          <p className="text-muted text-sm mt-2">Bild wird erzeugt… {attempt > 0 ? `(Versuch ${attempt + 1})` : ""}</p>
+        </div>
       )}
-      {status === "loading" && <span className="text-muted text-sm animate-pulse">Bild wird erzeugt…</span>}
-      {status === "fail" && <span className="text-8xl">{emoji || "🖼️"}</span>}
+      {status === "retry" && (
+        <div className="text-center">
+          <p className="text-muted text-sm mb-2">Bild gerade nicht verfügbar (Dienst ausgelastet).</p>
+          <button className="btn btn-primary" onClick={() => { setStatus("loading"); setAttempt((a) => a + 1); }}>Erneut versuchen</button>
+        </div>
+      )}
     </div>
   );
 }
