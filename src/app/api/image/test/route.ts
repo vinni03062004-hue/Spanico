@@ -24,17 +24,23 @@ export async function GET() {
   const cfAcc = process.env.CLOUDFLARE_ACCOUNT_ID;
   const cfTok = process.env.CLOUDFLARE_API_TOKEN;
   if (cfAcc && cfTok) {
+    const CF_MODEL = process.env.CLOUDFLARE_IMAGE_MODEL || "@cf/bytedance/stable-diffusion-xl-lightning";
     try {
-      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cfAcc}/ai/run/@cf/black-forest-labs/flux-1-schnell`, {
+      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cfAcc}/ai/run/${CF_MODEL}`, {
         method: "POST", headers: { authorization: `Bearer ${cfTok}`, "content-type": "application/json" },
-        body: JSON.stringify({ prompt: "a single red apple, plain white background, no text", steps: 4 }),
+        body: JSON.stringify({ prompt: "a single red apple on a plain white background", num_steps: 4 }),
       });
-      const body = await res.text();
+      const rct = res.headers.get("content-type") || "";
+      if (res.ok && rct.startsWith("image/")) {
+        const ab = await res.arrayBuffer();
+        if (ab.byteLength > 500) return NextResponse.json({ ok: true, model: `Cloudflare Workers AI — ${CF_MODEL}`, message: `Funktioniert ✓ — Bild erhalten (${Math.round(ab.byteLength / 1024)} KB)` });
+      }
+      const body = await res.text().catch(() => "");
       if (res.ok && body.includes("image")) {
-        return NextResponse.json({ ok: true, model: "Cloudflare Workers AI — FLUX.1 (hochwertig, ~230/Tag gratis)", message: "Funktioniert ✓ — Bild erhalten" });
+        return NextResponse.json({ ok: true, model: `Cloudflare Workers AI — ${CF_MODEL}`, message: "Funktioniert ✓ — Bild erhalten" });
       }
       let m = ""; try { m = JSON.parse(body)?.errors?.[0]?.message || JSON.parse(body)?.messages?.[0]?.message || ""; } catch {}
-      return NextResponse.json({ ok: false, model: "Cloudflare Workers AI", message: `Cloudflare antwortet mit ${res.status}. ${m.slice(0, 120)}`, hinweis: "Account-ID & API-Token (Vorlage 'Workers AI') in Vercel prüfen. Fällt sonst auf Pollinations zurück." });
+      return NextResponse.json({ ok: false, model: `Cloudflare Workers AI — ${CF_MODEL}`, message: `Cloudflare antwortet mit ${res.status}. ${m.slice(0, 140)}`, hinweis: "Account-ID & API-Token in Vercel prüfen. Fällt sonst auf Pollinations zurück." });
     } catch (e: any) {
       return NextResponse.json({ ok: false, model: "Cloudflare Workers AI", message: `Fehler: ${(e?.message || "").slice(0, 120)}` });
     }

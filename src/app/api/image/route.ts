@@ -59,19 +59,30 @@ export async function GET(req: NextRequest) {
   let buf: Buffer | null = null;
   let ct = "image/jpeg";
 
-  // 1) Cloudflare Workers AI (FLUX.1) — hochwertig, zuverlässig, ~230/Tag gratis.
+  // 1) Cloudflare Workers AI — hochwertig, zuverlässig, ~230/Tag gratis.
+  // SDXL-Lightning: schnell (4 Schritte), liefert PNG-Bytes direkt, ohne den
+  // überempfindlichen NSFW-Filter von FLUX-schnell.
   const cfAcc = process.env.CLOUDFLARE_ACCOUNT_ID;
   const cfTok = process.env.CLOUDFLARE_API_TOKEN;
+  const CF_MODEL = process.env.CLOUDFLARE_IMAGE_MODEL || "@cf/bytedance/stable-diffusion-xl-lightning";
   if (cfAcc && cfTok) {
     try {
-      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cfAcc}/ai/run/@cf/black-forest-labs/flux-1-schnell`, {
+      const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cfAcc}/ai/run/${CF_MODEL}`, {
         method: "POST", headers: { authorization: `Bearer ${cfTok}`, "content-type": "application/json" },
-        body: JSON.stringify({ prompt: promptEn, steps: 8 }),
+        body: JSON.stringify({ prompt: promptEn, num_steps: 6 }),
       });
       if (res.ok) {
-        const j = await res.json();
-        const b64 = j?.result?.image;
-        if (b64) { buf = Buffer.from(b64, "base64"); ct = "image/jpeg"; }
+        const rct = res.headers.get("content-type") || "";
+        if (rct.includes("application/json")) {
+          // manche Modelle liefern { result: { image: base64 } }
+          const j = await res.json();
+          const b64 = j?.result?.image;
+          if (b64) { buf = Buffer.from(b64, "base64"); ct = "image/png"; }
+        } else {
+          // SDXL liefert die PNG-Bytes direkt
+          const ab = await res.arrayBuffer();
+          if (ab.byteLength > 500) { buf = Buffer.from(ab); ct = rct || "image/png"; }
+        }
       } else { console.error("[image] cloudflare", res.status, (await res.text().catch(() => "")).slice(0, 160)); }
     } catch (e: any) { console.error("[image] cloudflare", e?.message || e); }
   }
