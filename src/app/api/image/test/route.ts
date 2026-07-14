@@ -24,7 +24,7 @@ export async function GET() {
   const cfAcc = process.env.CLOUDFLARE_ACCOUNT_ID;
   const cfTok = process.env.CLOUDFLARE_API_TOKEN;
   if (cfAcc && cfTok) {
-    const CF_MODEL = process.env.CLOUDFLARE_IMAGE_MODEL || "@cf/bytedance/stable-diffusion-xl-lightning";
+    const CF_MODEL = process.env.CLOUDFLARE_IMAGE_MODEL || "@cf/stabilityai/stable-diffusion-xl-base-1.0";
     try {
       const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cfAcc}/ai/run/${CF_MODEL}`, {
         method: "POST", headers: { authorization: `Bearer ${cfTok}`, "content-type": "application/json" },

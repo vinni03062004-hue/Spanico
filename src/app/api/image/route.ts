@@ -53,23 +53,27 @@ export async function GET(req: NextRequest) {
     if (row?.data) return new NextResponse(Buffer.from(row.data as any), { headers: { "content-type": row.contentType, "x-cache": "db", "cache-control": "public, max-age=31536000" } });
   } catch {}
 
-  const promptEn = `A clear, high-quality, colorful illustration of "${meaning}" (Spanish: ${word}). One single, clearly recognizable ${meaning} — the correct real object — centered and isolated on a plain white background. Clean, sharp, unambiguous. No text, no letters, no watermark.`;
-  const promptDe = `Eine klare, hochwertige, farbige Illustration von: ${meaning || word} ("${word}" auf Spanisch). Ein einzelnes zentrales Motiv, schlichter heller Hintergrund, KEIN Text.`;
+  // Kurz & konkret: das Motiv zuerst, danach knapper Stil. Lange Prompts
+  // verwirren die schnellen Modelle (führen zu Mosaik/schwarzen Bildern).
+  const subject = meaning || word;
+  const promptEn = `${subject}, simple colorful illustration, centered, plain white background`;
+  const negativeEn = `text, letters, words, watermark, blurry, distorted, deformed, extra limbs, multiple objects, collage, mosaic, low quality`;
+  const promptDe = `Einfache farbige Illustration von ${subject}, zentriert, weißer Hintergrund, kein Text.`;
 
   let buf: Buffer | null = null;
   let ct = "image/jpeg";
 
   // 1) Cloudflare Workers AI — hochwertig, zuverlässig, ~230/Tag gratis.
-  // SDXL-Lightning: schnell (4 Schritte), liefert PNG-Bytes direkt, ohne den
-  // überempfindlichen NSFW-Filter von FLUX-schnell.
+  // SDXL-Base: stabiler & hochwertiger als Lightning (keine schwarzen/Mosaik-
+  // Bilder), liefert PNG-Bytes direkt, ohne den kaputten NSFW-Filter von FLUX.
   const cfAcc = process.env.CLOUDFLARE_ACCOUNT_ID;
   const cfTok = process.env.CLOUDFLARE_API_TOKEN;
-  const CF_MODEL = process.env.CLOUDFLARE_IMAGE_MODEL || "@cf/bytedance/stable-diffusion-xl-lightning";
+  const CF_MODEL = process.env.CLOUDFLARE_IMAGE_MODEL || "@cf/stabilityai/stable-diffusion-xl-base-1.0";
   if (cfAcc && cfTok) {
     try {
       const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cfAcc}/ai/run/${CF_MODEL}`, {
         method: "POST", headers: { authorization: `Bearer ${cfTok}`, "content-type": "application/json" },
-        body: JSON.stringify({ prompt: promptEn, num_steps: 6 }),
+        body: JSON.stringify({ prompt: promptEn, negative_prompt: negativeEn, num_steps: 20 }),
       });
       if (res.ok) {
         const rct = res.headers.get("content-type") || "";
