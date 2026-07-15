@@ -84,18 +84,20 @@ async function listChatModels(key: string): Promise<string[]> {
 }
 
 // Ein Gemini-Modell aufrufen. Gibt Status + geparste Felder zurück.
-async function callGemini(model: string, key: string, userText: string): Promise<{ status: number; reply?: string; parsed?: any }> {
+async function callGemini(model: string, key: string, userText: string, json = true): Promise<{ status: number; reply?: string; parsed?: any }> {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: userText }] }],
-      generationConfig: { temperature: 0.7, responseMimeType: "application/json" },
+      generationConfig: json ? { temperature: 0.7, responseMimeType: "application/json" } : { temperature: 0.7 },
     }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     console.error(`[coach] ${model} HTTP ${res.status} ${body.slice(0, 140)}`);
+    // Manche Modelle unterstützen responseMimeType nicht -> einmal ohne wiederholen.
+    if (res.status === 400 && json) return callGemini(model, key, userText, false);
     return { status: res.status };
   }
   const data = await res.json();

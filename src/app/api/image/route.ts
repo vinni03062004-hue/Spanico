@@ -47,11 +47,11 @@ async function translateFree(text: string, pair: string): Promise<string | null>
   } catch { return null; }
 }
 
-// Optional: Gemini für ein noch treffenderes Motiv (nur wenn Key vorhanden).
+// Gemini für eine zuverlässige Übersetzung (kennt z.B. "ladrón" = thief).
 async function toEnglishGemini(de: string, es: string): Promise<string | null> {
   const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
   if (!key) return null;
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-flash-lite-latest";
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
       method: "POST", headers: { "content-type": "application/json" },
@@ -67,17 +67,17 @@ async function toEnglishGemini(de: string, es: string): Promise<string | null> {
   } catch { return null; }
 }
 
-// Ermittelt den englischen Suchbegriff. WICHTIG: Standardmaessig OHNE Gemini,
-// damit das (knappe) Gemini-Tageskontingent komplett fuer Jarvis frei bleibt.
-// MyMemory ist kostenlos und hat kein Google-Kontingent. Gemini nur, wenn
-// ausdruecklich per IMAGE_TRANSLATE=gemini gewuenscht.
+// Ermittelt den englischen Suchbegriff. Gemini zuerst (zuverlaessig — der
+// kostenlose MyMemory-Dienst liefert bei manchen Woertern Unsinn, z.B.
+// "ladrón" -> "cross or branch culvert"). MyMemory nur als Notnagel.
+// Pro Wort nur EINMAL (danach Bild-Cache) -> geringer Kontingentverbrauch.
 async function toEnglishSubject(de: string, es: string): Promise<string | null> {
-  const free =
+  const g = await toEnglishGemini(de, es);
+  if (g) return g;
+  return (
     (es ? await translateFree(es, "es|en") : null) ||
-    (de ? await translateFree(de, "de|en") : null);
-  if (free) return free;
-  if (process.env.IMAGE_TRANSLATE === "gemini") return await toEnglishGemini(de, es);
-  return null;
+    (de ? await translateFree(de, "de|en") : null)
+  );
 }
 
 // Echte Fotos zum (englischen) Begriff — für Vokabeln viel treffsicherer als
