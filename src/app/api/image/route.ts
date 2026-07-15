@@ -28,10 +28,27 @@ async function listImageModels(key: string): Promise<string[]> {
   } catch { return []; }
 }
 
-// Übersetzt das deutsche/spanische Wort in ein kurzes, konkretes ENGLISCHES
-// Motiv fürs Bildmodell (Bildmodelle verstehen nur Englisch gut). Läuft nur
-// beim erstmaligen Erzeugen eines Wortes (danach Bild-Cache) -> kaum Kosten.
-async function toEnglishSubject(de: string, es: string): Promise<string | null> {
+function clean(s: string): string {
+  return (s || "").replace(/["'.\n\r]/g, " ").replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+}
+
+// Kostenlose Übersetzung OHNE Key (MyMemory). Übersetzt das spanische Wort
+// direkt ins Englische -> die Fotosuche findet dann den richtigen Begriff.
+async function translateFree(text: string, pair: string): Promise<string | null> {
+  try {
+    const r = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${pair}`);
+    if (!r.ok) return null;
+    const j = await r.json();
+    const t = clean(j?.responseData?.translatedText || "");
+    // MyMemory gibt bei Unbekanntem manchmal den Originaltext / Fehlermeldungen zurück.
+    if (!t || t.length > 60 || /no query|invalid|mymemory|please/i.test(t)) return null;
+    if (t.toLowerCase() === text.toLowerCase()) return null;
+    return t;
+  } catch { return null; }
+}
+
+// Optional: Gemini für ein noch treffenderes Motiv (nur wenn Key vorhanden).
+async function toEnglishGemini(de: string, es: string): Promise<string | null> {
   const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
   if (!key) return null;
   const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
@@ -39,16 +56,25 @@ async function toEnglishSubject(de: string, es: string): Promise<string | null> 
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: `Translate to a short, concrete English noun phrase (1-4 words) naming the depictable object or concept, for use as the subject of a simple illustration. German: "${de}". Spanish: "${es}". If it is abstract or a verb, give the most typical concrete scene (e.g. swim -> "person swimming in water"). Reply with ONLY the English phrase, no punctuation, no quotes.` }] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 24 },
+        contents: [{ role: "user", parts: [{ text: `Translate to a short, concrete English noun phrase (1-3 words) naming the depictable object, for a photo search. German: "${de}". Spanish: "${es}". Reply with ONLY the English word(s), no punctuation.` }] }],
+        generationConfig: { temperature: 0, maxOutputTokens: 16 },
       }),
     });
     if (!res.ok) return null;
     const j = await res.json();
-    const t: string = j?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    const clean = t.replace(/["'.\n\r]/g, " ").replace(/\s+/g, " ").trim();
-    return clean.length >= 2 && clean.length <= 60 ? clean : null;
+    const t = clean(j?.candidates?.[0]?.content?.parts?.[0]?.text || "");
+    return t.length >= 2 && t.length <= 60 ? t : null;
   } catch { return null; }
+}
+
+// Ermittelt den englischen Suchbegriff: erst Gemini (falls Key), sonst der
+// kostenlose Dienst (Spanisch->Englisch, dann Deutsch->Englisch).
+async function toEnglishSubject(de: string, es: string): Promise<string | null> {
+  return (
+    (await toEnglishGemini(de, es)) ||
+    (es ? await translateFree(es, "es|en") : null) ||
+    (de ? await translateFree(de, "de|en") : null)
+  );
 }
 
 // Echte Fotos zum (englischen) Begriff — für Vokabeln viel treffsicherer als
