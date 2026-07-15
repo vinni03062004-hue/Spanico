@@ -41,10 +41,14 @@ export async function runCoach(ctx: CoachContext): Promise<CoachResult> {
   const openaiKey = process.env.OPENAI_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
 
+  console.log(`[coach] keys: gemini=${!!geminiKey} anthropic=${!!anthropicKey} openai=${!!openaiKey}`);
+
   if (geminiKey) {
     try {
       return await viaGemini(ctx, geminiKey);
-    } catch (e) {}
+    } catch (e: any) {
+      console.error("[coach] gemini failed -> fallback:", e?.message || e);
+    }
   }
   if (anthropicKey) {
     try {
@@ -58,12 +62,13 @@ export async function runCoach(ctx: CoachContext): Promise<CoachResult> {
       return await viaOpenAI(ctx, openaiKey);
     } catch (e) {}
   }
+  console.warn("[coach] using rule fallback (kein KI-Key aktiv oder alle fehlgeschlagen)");
   return ruleCoach(ctx);
 }
 
 // Google Gemini (kostenloser Free-Tier über Google AI Studio).
 async function viaGemini(ctx: CoachContext, key: string): Promise<CoachResult> {
-  const model = process.env.GEMINI_MODEL || "gemini-1.5-flash-latest";
+  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
   const userText = SYSTEM + "\n\nKontext (JSON): " + JSON.stringify({ szenario: ctx.scenarioTitle, aufgabe: ctx.stepPromptDe, zielphrasen: ctx.targetsEs, niveau: ctx.level, gedaechtnis: ctx.memory, nutzer_sagte: ctx.userSaid });
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
@@ -72,15 +77,28 @@ async function viaGemini(ctx: CoachContext, key: string): Promise<CoachResult> {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: userText }] }],
+        // Erzwingt sauberes JSON -> zuverlaessiges Parsen der Felder.
+        generationConfig: { temperature: 0.7, responseMimeType: "application/json" },
       }),
     }
   );
-  if (!res.ok) throw new Error("gemini " + res.status);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error("[coach] gemini HTTP", res.status, body.slice(0, 180));
+    throw new Error("gemini " + res.status);
+  }
   const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+  const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
   const parsed = safeJson(text);
+  // Falls kein JSON-"reply": Klartext der Antwort direkt verwenden (statt festem Satz).
+  let reply: string = typeof parsed.reply === "string" ? parsed.reply : "";
+  if (!reply) {
+    reply = text.replace(/```[a-z]*|```/gi, "").replace(/^\s*\{[\s\S]*\}\s*$/, "").trim();
+  }
+  if (!reply) reply = "¿Puedes contarme un poco más?";
+  console.log(`[coach] gemini ok · userSaid="${ctx.userSaid.slice(0, 40)}" · reply="${reply.slice(0, 50)}"`);
   return {
-    reply: parsed.reply || "Vale, sigamos.",
+    reply,
     correction: parsed.correction,
     ruleHint: parsed.ruleHint,
     goodExample: parsed.goodExample,
