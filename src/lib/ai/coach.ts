@@ -66,45 +66,80 @@ export async function runCoach(ctx: CoachContext): Promise<CoachResult> {
   return ruleCoach(ctx);
 }
 
-// Google Gemini (kostenloser Free-Tier über Google AI Studio).
-async function viaGemini(ctx: CoachContext, key: string): Promise<CoachResult> {
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-  const userText = SYSTEM + "\n\nKontext (JSON): " + JSON.stringify({ szenario: ctx.scenarioTitle, aufgabe: ctx.stepPromptDe, zielphrasen: ctx.targetsEs, niveau: ctx.level, gedaechtnis: ctx.memory, nutzer_sagte: ctx.userSaid });
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: userText }] }],
-        // Erzwingt sauberes JSON -> zuverlaessiges Parsen der Felder.
-        generationConfig: { temperature: 0.7, responseMimeType: "application/json" },
-      }),
-    }
-  );
+// Einmal ermitteltes, funktionierendes Chat-Modell (pro Warm-Instanz gecacht).
+let RESOLVED_CHAT_MODEL: string | null = null;
+
+// Verfügbare Text-Modelle des Keys ermitteln (flash/lite bevorzugt -> hohe Gratis-Limits).
+async function listChatModels(key: string): Promise<string[]> {
+  try {
+    const lm = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}&pageSize=200`).then((r) => r.json());
+    const names = (lm?.models || [])
+      .filter((m: any) => (m.supportedGenerationMethods || []).includes("generateContent"))
+      .map((m: any) => (m.name || "").replace("models/", ""))
+      .filter((n: string) => n && !n.includes("image") && !n.includes("embedding") && !n.includes("vision") && !n.includes("tts") && !n.includes("audio"));
+    const rank = (n: string) => (n.includes("lite") ? 0 : n.includes("flash") ? 1 : 2);
+    names.sort((a: string, b: string) => rank(a) - rank(b));
+    return names;
+  } catch { return []; }
+}
+
+// Ein Gemini-Modell aufrufen. Gibt Status + geparste Felder zurück.
+async function callGemini(model: string, key: string, userText: string): Promise<{ status: number; reply?: string; parsed?: any }> {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: userText }] }],
+      generationConfig: { temperature: 0.7, responseMimeType: "application/json" },
+    }),
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    console.error("[coach] gemini HTTP", res.status, body.slice(0, 180));
-    throw new Error("gemini " + res.status);
+    console.error(`[coach] ${model} HTTP ${res.status} ${body.slice(0, 140)}`);
+    return { status: res.status };
   }
   const data = await res.json();
   const text: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
   const parsed = safeJson(text);
-  // Falls kein JSON-"reply": Klartext der Antwort direkt verwenden (statt festem Satz).
   let reply: string = typeof parsed.reply === "string" ? parsed.reply : "";
-  if (!reply) {
-    reply = text.replace(/```[a-z]*|```/gi, "").replace(/^\s*\{[\s\S]*\}\s*$/, "").trim();
+  if (!reply) reply = text.replace(/```[a-z]*|```/gi, "").replace(/^\s*\{[\s\S]*\}\s*$/, "").trim();
+  return { status: 200, reply, parsed };
+}
+
+// Google Gemini: probiert mehrere Modelle, nimmt das erste mit Kontingent.
+async function viaGemini(ctx: CoachContext, key: string): Promise<CoachResult> {
+  const userText = SYSTEM + "\n\nKontext (JSON): " + JSON.stringify({ szenario: ctx.scenarioTitle, aufgabe: ctx.stepPromptDe, zielphrasen: ctx.targetsEs, niveau: ctx.level, gedaechtnis: ctx.memory, nutzer_sagte: ctx.userSaid });
+
+  // Reihenfolge: zuletzt funktionierendes, dann eingestelltes, dann bewährte Fallbacks.
+  let candidates = [RESOLVED_CHAT_MODEL, process.env.GEMINI_MODEL, "gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest", "gemini-2.0-flash-lite", "gemini-1.5-flash-latest"].filter(Boolean) as string[];
+  candidates = Array.from(new Set(candidates));
+
+  let sawQuota = false;
+  for (const model of candidates) {
+    const r = await callGemini(model, key, userText);
+    if (r.status === 200) {
+      RESOLVED_CHAT_MODEL = model;
+      const reply = r.reply || "¿Puedes contarme un poco más?";
+      console.log(`[coach] gemini ok (${model}) · userSaid="${ctx.userSaid.slice(0, 40)}" · reply="${reply.slice(0, 50)}"`);
+      return { reply, correction: r.parsed?.correction, ruleHint: r.parsed?.ruleHint, goodExample: r.parsed?.goodExample, matchedTargets: matched(ctx), provider: `gemini:${model}` };
+    }
+    if (r.status === 429) sawQuota = true;
   }
-  if (!reply) reply = "¿Puedes contarme un poco más?";
-  console.log(`[coach] gemini ok · userSaid="${ctx.userSaid.slice(0, 40)}" · reply="${reply.slice(0, 50)}"`);
-  return {
-    reply,
-    correction: parsed.correction,
-    ruleHint: parsed.ruleHint,
-    goodExample: parsed.goodExample,
-    matchedTargets: matched(ctx),
-    provider: "gemini",
-  };
+
+  // Alle bekannten Modelle blockiert -> verfügbare Modelle des Keys ermitteln und durchprobieren.
+  const discovered = (await listChatModels(key)).filter((m) => !candidates.includes(m));
+  console.log(`[coach] entdecke Modelle: ${discovered.slice(0, 8).join(", ")}`);
+  for (const model of discovered) {
+    const r = await callGemini(model, key, userText);
+    if (r.status === 200) {
+      RESOLVED_CHAT_MODEL = model;
+      const reply = r.reply || "¿Puedes contarme un poco más?";
+      console.log(`[coach] gemini ok via Discovery (${model})`);
+      return { reply, correction: r.parsed?.correction, ruleHint: r.parsed?.ruleHint, goodExample: r.parsed?.goodExample, matchedTargets: matched(ctx), provider: `gemini:${model}` };
+    }
+    if (r.status === 429) sawQuota = true;
+  }
+  throw new Error("gemini alle Modelle" + (sawQuota ? " 429 (Kontingent)" : " Fehler"));
 }
 
 async function viaAnthropic(ctx: CoachContext, key: string): Promise<CoachResult> {

@@ -67,14 +67,17 @@ async function toEnglishGemini(de: string, es: string): Promise<string | null> {
   } catch { return null; }
 }
 
-// Ermittelt den englischen Suchbegriff: erst Gemini (falls Key), sonst der
-// kostenlose Dienst (Spanisch->Englisch, dann Deutsch->Englisch).
+// Ermittelt den englischen Suchbegriff. WICHTIG: Standardmaessig OHNE Gemini,
+// damit das (knappe) Gemini-Tageskontingent komplett fuer Jarvis frei bleibt.
+// MyMemory ist kostenlos und hat kein Google-Kontingent. Gemini nur, wenn
+// ausdruecklich per IMAGE_TRANSLATE=gemini gewuenscht.
 async function toEnglishSubject(de: string, es: string): Promise<string | null> {
-  return (
-    (await toEnglishGemini(de, es)) ||
+  const free =
     (es ? await translateFree(es, "es|en") : null) ||
-    (de ? await translateFree(de, "de|en") : null)
-  );
+    (de ? await translateFree(de, "de|en") : null);
+  if (free) return free;
+  if (process.env.IMAGE_TRANSLATE === "gemini") return await toEnglishGemini(de, es);
+  return null;
 }
 
 // Echte Fotos zum (englischen) Begriff — für Vokabeln viel treffsicherer als
