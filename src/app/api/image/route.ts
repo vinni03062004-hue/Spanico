@@ -28,6 +28,29 @@ async function listImageModels(key: string): Promise<string[]> {
   } catch { return []; }
 }
 
+// Übersetzt das deutsche/spanische Wort in ein kurzes, konkretes ENGLISCHES
+// Motiv fürs Bildmodell (Bildmodelle verstehen nur Englisch gut). Läuft nur
+// beim erstmaligen Erzeugen eines Wortes (danach Bild-Cache) -> kaum Kosten.
+async function toEnglishSubject(de: string, es: string): Promise<string | null> {
+  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY;
+  if (!key) return null;
+  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: `Translate to a short, concrete English noun phrase (1-4 words) naming the depictable object or concept, for use as the subject of a simple illustration. German: "${de}". Spanish: "${es}". If it is abstract or a verb, give the most typical concrete scene (e.g. swim -> "person swimming in water"). Reply with ONLY the English phrase, no punctuation, no quotes.` }] }],
+        generationConfig: { temperature: 0, maxOutputTokens: 24 },
+      }),
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const t: string = j?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const clean = t.replace(/["'.\n\r]/g, " ").replace(/\s+/g, " ").trim();
+    return clean.length >= 2 && clean.length <= 60 ? clean : null;
+  } catch { return null; }
+}
+
 async function generate(model: string, key: string, prompt: string): Promise<{ data: string; ct: string } | null> {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
     method: "POST", headers: { "content-type": "application/json" },
@@ -55,7 +78,9 @@ export async function GET(req: NextRequest) {
 
   // Kurz & konkret: das Motiv zuerst, danach knapper Stil. Lange Prompts
   // verwirren die schnellen Modelle (führen zu Mosaik/schwarzen Bildern).
-  const subject = meaning || word;
+  // WICHTIG: erst ins Englische übersetzen (Modelle verstehen kein Deutsch).
+  const englishSubject = await toEnglishSubject(meaning, word);
+  const subject = englishSubject || meaning || word;
   const promptEn = `${subject}, simple colorful illustration, centered, plain white background`;
   const negativeEn = `text, letters, words, watermark, blurry, distorted, deformed, extra limbs, multiple objects, collage, mosaic, low quality`;
   const promptDe = `Einfache farbige Illustration von ${subject}, zentriert, weißer Hintergrund, kein Text.`;
