@@ -98,21 +98,22 @@ export default function Bilder() {
 function WordImage({ word, meaning }: { word: string; meaning: string; emoji?: string }) {
   const [status, setStatus] = useState<"loading" | "ok" | "retry">("loading");
   const [attempt, setAttempt] = useState(0);
-  const src = `/api/image?word=${encodeURIComponent(word)}&meaning=${encodeURIComponent(meaning)}&r=${attempt}`;
-  useEffect(() => { setStatus("loading"); setAttempt(0); }, [word]);
+  const [alt, setAlt] = useState(0); // "anderes Bild": zählt Alternativen hoch
+  const src = `/api/image?word=${encodeURIComponent(word)}&meaning=${encodeURIComponent(meaning)}${alt > 0 ? `&alt=${alt}` : ""}&r=${attempt}`;
+  useEffect(() => { setStatus("loading"); setAttempt(0); setAlt(0); }, [word]);
 
   function onError() {
-    // Auto-Wiederholung mit kurzer Pause (Pollinations-Drosselung abwarten).
-    if (attempt < 8) {
+    // Auto-Wiederholung mit kurzer Pause (Dienst evtl. kurz ausgelastet).
+    if (attempt < 6) {
       setStatus("loading");
-      setTimeout(() => setAttempt((a) => a + 1), 3500);
+      setTimeout(() => setAttempt((a) => a + 1), 2500);
     } else {
       setStatus("retry");
     }
   }
 
   return (
-    <div className="mb-6 flex flex-col items-center justify-center min-h-48">
+    <div className="mb-4 flex flex-col items-center justify-center min-h-48">
       <img
         src={src}
         alt=""
@@ -123,14 +124,22 @@ function WordImage({ word, meaning }: { word: string; meaning: string; emoji?: s
       {status === "loading" && (
         <div className="text-center">
           <div className="w-10 h-10 mx-auto rounded-full border-2 border-primary/40 border-t-primary animate-spin" />
-          <p className="text-muted text-sm mt-2">Bild wird erzeugt… {attempt > 0 ? `(Versuch ${attempt + 1})` : ""}</p>
+          <p className="text-muted text-sm mt-2">Bild wird geladen… {attempt > 0 ? `(Versuch ${attempt + 1})` : ""}</p>
         </div>
       )}
       {status === "retry" && (
         <div className="text-center">
-          <p className="text-muted text-sm mb-2">Bild gerade nicht verfügbar (Dienst ausgelastet).</p>
+          <p className="text-muted text-sm mb-2">Bild gerade nicht verfügbar.</p>
           <button className="btn btn-primary" onClick={() => { setStatus("loading"); setAttempt((a) => a + 1); }}>Erneut versuchen</button>
         </div>
+      )}
+      {status === "ok" && (
+        <button
+          className="text-[11px] text-muted/70 hover:text-primary mt-2 underline underline-offset-2"
+          onClick={() => { setStatus("loading"); setAlt((a) => a + 1); }}
+        >
+          Passt nicht? Anderes Bild
+        </button>
       )}
     </div>
   );

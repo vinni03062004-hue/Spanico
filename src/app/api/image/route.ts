@@ -80,23 +80,27 @@ async function toEnglishSubject(de: string, es: string): Promise<string | null> 
 // Echte Fotos zum (englischen) Begriff — für Vokabeln viel treffsicherer als
 // KI-Erzeugung. Pixabay (mit Gratis-Key, sehr sauber) bevorzugt, sonst
 // Openverse (kostenlos, ohne Key).
-async function photoSearch(query: string): Promise<{ data: Buffer; ct: string } | null> {
+// skip = wie viele passende Treffer übersprungen werden ("anderes Bild").
+async function photoSearch(query: string, skip = 0): Promise<{ data: Buffer; ct: string } | null> {
   const q = encodeURIComponent(query);
   const px = process.env.PIXABAY_API_KEY;
   if (px) {
     try {
-      const r = await fetch(`https://pixabay.com/api/?key=${px}&q=${q}&image_type=photo&per_page=3&safesearch=true&order=popular`);
+      const r = await fetch(`https://pixabay.com/api/?key=${px}&q=${q}&image_type=photo&per_page=20&safesearch=true&order=popular`);
       if (r.ok) {
         const j = await r.json();
-        const u = j?.hits?.[0]?.webformatURL || j?.hits?.[0]?.largeImageURL;
+        const hits = j?.hits || [];
+        const hit = hits[skip % Math.max(1, hits.length)];
+        const u = hit?.webformatURL || hit?.largeImageURL;
         if (u) { const ir = await fetch(u); if (ir.ok) { const ab = await ir.arrayBuffer(); if (ab.byteLength > 500) return { data: Buffer.from(ab), ct: ir.headers.get("content-type") || "image/jpeg" }; } }
       }
     } catch {}
   }
   try {
-    const r = await fetch(`https://api.openverse.org/v1/images/?q=${q}&page_size=10&mature=false`, { headers: { "User-Agent": "Spanico/1.0 (language-learning app)" } });
+    const r = await fetch(`https://api.openverse.org/v1/images/?q=${q}&page_size=20&mature=false`, { headers: { "User-Agent": "Spanico/1.0 (language-learning app)" } });
     if (r.ok) {
       const j = await r.json();
+      let seen = 0;
       for (const hit of (j?.results || [])) {
         const u = hit?.thumbnail || hit?.url;
         if (!u) continue;
@@ -106,7 +110,10 @@ async function photoSearch(query: string): Promise<{ data: Buffer; ct: string } 
           const ict = ir.headers.get("content-type") || "";
           if (!ict.startsWith("image/")) continue;
           const ab = await ir.arrayBuffer();
-          if (ab.byteLength > 800) return { data: Buffer.from(ab), ct: ict || "image/jpeg" };
+          if (ab.byteLength > 800) {
+            if (seen++ < skip) continue; // vorherige Treffer überspringen
+            return { data: Buffer.from(ab), ct: ict || "image/jpeg" };
+          }
         } catch {}
       }
     }
@@ -131,13 +138,17 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const word = (url.searchParams.get("word") || "").trim().toLowerCase();
   const meaning = (url.searchParams.get("meaning") || "").trim();
+  // "alt": alternatives Bild anfordern (überspringt Cache & vorherige Treffer).
+  const alt = Math.max(0, parseInt(url.searchParams.get("alt") || "0", 10) || 0);
   if (!word) return new NextResponse(null, { status: 400 });
 
-  // 1) Cache
-  try {
-    const row = await prisma.imageCache.findUnique({ where: { key: word } });
-    if (row?.data) return new NextResponse(Buffer.from(row.data as any), { headers: { "content-type": row.contentType, "x-cache": "db", "cache-control": "public, max-age=31536000" } });
-  } catch {}
+  // 1) Cache (nur wenn kein alternatives Bild verlangt wird)
+  if (alt === 0) {
+    try {
+      const row = await prisma.imageCache.findUnique({ where: { key: word } });
+      if (row?.data) return new NextResponse(Buffer.from(row.data as any), { headers: { "content-type": row.contentType, "x-cache": "db", "cache-control": "public, max-age=31536000" } });
+    } catch {}
+  }
 
   // Kurz & konkret: das Motiv zuerst, danach knapper Stil. Lange Prompts
   // verwirren die schnellen Modelle (führen zu Mosaik/schwarzen Bildern).
@@ -154,7 +165,7 @@ export async function GET(req: NextRequest) {
   // 1) Echte Fotos zum Begriff (Pixabay/Openverse) — für Vokabeln am
   // treffsichersten. Kein Kachel-/Mosaik-Müll, weil es reale Bilder sind.
   if (process.env.IMAGE_PROVIDER !== "ai") {
-    const ph = await photoSearch(subject);
+    const ph = await photoSearch(subject, alt);
     if (ph) { buf = ph.data; ct = ph.ct; }
   }
 
@@ -212,6 +223,6 @@ export async function GET(req: NextRequest) {
 
   if (!buf || buf.length < 100) return new NextResponse(null, { status: 404 });
 
-  try { await prisma.imageCache.create({ data: { key: word, contentType: ct, data: buf } }); } catch {}
+  try { await prisma.imageCache.upsert({ where: { key: word }, create: { key: word, contentType: ct, data: buf }, update: { contentType: ct, data: buf } }); } catch {}
   return new NextResponse(buf, { headers: { "content-type": ct, "x-cache": "miss", "cache-control": "public, max-age=31536000" } });
 }
