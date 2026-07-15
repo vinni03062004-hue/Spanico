@@ -20,7 +20,23 @@ export async function GET() {
   const u = await requireUser();
   if ("error" in u) return u.error;
 
-  // 1) Cloudflare Workers AI (FLUX.1) prüfen — empfohlene, hochwertige Quelle.
+  // 1) Echte Fotos (Standardquelle, treffsicher für Vokabeln).
+  if (process.env.IMAGE_PROVIDER !== "ai") {
+    const px = process.env.PIXABAY_API_KEY;
+    try {
+      if (px) {
+        const r = await fetch(`https://pixabay.com/api/?key=${px}&q=cheese&image_type=photo&per_page=3&safesearch=true`);
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && (j?.hits?.length || 0) > 0) return NextResponse.json({ ok: true, model: "Pixabay (echte Fotos, Gratis-Key)", message: `Funktioniert ✓ — ${j.totalHits} Treffer für Testbegriff.` });
+        return NextResponse.json({ ok: false, model: "Pixabay", message: `Pixabay antwortet mit ${r.status}. Key prüfen. Fällt auf Openverse zurück.` });
+      }
+      const r = await fetch("https://api.openverse.org/v1/images/?q=cheese&page_size=3&mature=false", { headers: { "User-Agent": "Spanico/1.0 (language-learning app)" } });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && (j?.results?.length || 0) > 0) return NextResponse.json({ ok: true, model: "Openverse (echte Fotos, kostenlos, ohne Key)", message: `Funktioniert ✓ — ${j.result_count} Treffer für Testbegriff.` });
+    } catch (e: any) { /* unten KI prüfen */ }
+  }
+
+  // 2) Cloudflare Workers AI prüfen — KI-Fallback.
   const cfAcc = process.env.CLOUDFLARE_ACCOUNT_ID;
   const cfTok = process.env.CLOUDFLARE_API_TOKEN;
   if (cfAcc && cfTok) {

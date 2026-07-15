@@ -51,6 +51,43 @@ async function toEnglishSubject(de: string, es: string): Promise<string | null> 
   } catch { return null; }
 }
 
+// Echte Fotos zum (englischen) Begriff — für Vokabeln viel treffsicherer als
+// KI-Erzeugung. Pixabay (mit Gratis-Key, sehr sauber) bevorzugt, sonst
+// Openverse (kostenlos, ohne Key).
+async function photoSearch(query: string): Promise<{ data: Buffer; ct: string } | null> {
+  const q = encodeURIComponent(query);
+  const px = process.env.PIXABAY_API_KEY;
+  if (px) {
+    try {
+      const r = await fetch(`https://pixabay.com/api/?key=${px}&q=${q}&image_type=photo&per_page=3&safesearch=true&order=popular`);
+      if (r.ok) {
+        const j = await r.json();
+        const u = j?.hits?.[0]?.webformatURL || j?.hits?.[0]?.largeImageURL;
+        if (u) { const ir = await fetch(u); if (ir.ok) { const ab = await ir.arrayBuffer(); if (ab.byteLength > 500) return { data: Buffer.from(ab), ct: ir.headers.get("content-type") || "image/jpeg" }; } }
+      }
+    } catch {}
+  }
+  try {
+    const r = await fetch(`https://api.openverse.org/v1/images/?q=${q}&page_size=10&mature=false`, { headers: { "User-Agent": "Spanico/1.0 (language-learning app)" } });
+    if (r.ok) {
+      const j = await r.json();
+      for (const hit of (j?.results || [])) {
+        const u = hit?.thumbnail || hit?.url;
+        if (!u) continue;
+        try {
+          const ir = await fetch(u);
+          if (!ir.ok) continue;
+          const ict = ir.headers.get("content-type") || "";
+          if (!ict.startsWith("image/")) continue;
+          const ab = await ir.arrayBuffer();
+          if (ab.byteLength > 800) return { data: Buffer.from(ab), ct: ict || "image/jpeg" };
+        } catch {}
+      }
+    }
+  } catch {}
+  return null;
+}
+
 async function generate(model: string, key: string, prompt: string): Promise<{ data: string; ct: string } | null> {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
     method: "POST", headers: { "content-type": "application/json" },
@@ -88,13 +125,20 @@ export async function GET(req: NextRequest) {
   let buf: Buffer | null = null;
   let ct = "image/jpeg";
 
-  // 1) Cloudflare Workers AI — hochwertig, zuverlässig, ~230/Tag gratis.
+  // 1) Echte Fotos zum Begriff (Pixabay/Openverse) — für Vokabeln am
+  // treffsichersten. Kein Kachel-/Mosaik-Müll, weil es reale Bilder sind.
+  if (process.env.IMAGE_PROVIDER !== "ai") {
+    const ph = await photoSearch(subject);
+    if (ph) { buf = ph.data; ct = ph.ct; }
+  }
+
+  // 2) Cloudflare Workers AI — hochwertig, zuverlässig, ~230/Tag gratis.
   // SDXL-Base: stabiler & hochwertiger als Lightning (keine schwarzen/Mosaik-
   // Bilder), liefert PNG-Bytes direkt, ohne den kaputten NSFW-Filter von FLUX.
   const cfAcc = process.env.CLOUDFLARE_ACCOUNT_ID;
   const cfTok = process.env.CLOUDFLARE_API_TOKEN;
   const CF_MODEL = process.env.CLOUDFLARE_IMAGE_MODEL || "@cf/stabilityai/stable-diffusion-xl-base-1.0";
-  if (cfAcc && cfTok) {
+  if (!buf && cfAcc && cfTok) {
     try {
       const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cfAcc}/ai/run/${CF_MODEL}`, {
         method: "POST", headers: { authorization: `Bearer ${cfTok}`, "content-type": "application/json" },
